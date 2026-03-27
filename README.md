@@ -11,6 +11,12 @@ The package is in active bootstrap. Phase 0 establishes the real package baselin
 - PHP 8.1+
 - Laravel 10, 11, 12, and 13
 
+## Safety defaults
+
+- `RESILIENCE_ENABLED=true` keeps the package available by default
+- `resilience.blocked_environments` defaults to `['production']`
+- removing `'production'` from `resilience.blocked_environments` explicitly allows production activation
+
 ## Planned capabilities
 
 - deterministic fault injection for container-managed services and Laravel integrations
