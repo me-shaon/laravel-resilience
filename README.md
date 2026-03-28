@@ -101,7 +101,23 @@ Resilience::assertDegradedButSuccessful(
 
 ## Installation
 
-The package is not published yet. For local development, install dependencies with:
+Release tags are available from GitHub. Until Packagist publishing is set up, install the package from the repository:
+
+```json
+{
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/me-shaon/laravel-resilience"
+        }
+    ],
+    "require": {
+        "me-shaon/laravel-resilience": "^0.1"
+    }
+}
+```
+
+For local development, install dependencies with:
 
 ```bash
 composer install
