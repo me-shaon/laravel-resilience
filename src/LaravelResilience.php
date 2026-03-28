@@ -3,17 +3,22 @@
 namespace MeShaon\LaravelResilience;
 
 use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
 use MeShaon\LaravelResilience\Faults\FaultManager;
 use MeShaon\LaravelResilience\Faults\FaultRule;
 use MeShaon\LaravelResilience\Faults\FaultScope;
 use MeShaon\LaravelResilience\Faults\FaultTarget;
 use MeShaon\LaravelResilience\Faults\Injectors\ContainerFaultInjector;
 use MeShaon\LaravelResilience\Support\EnvironmentGuard;
+use PHPUnit\Framework\Assert;
 
 final class LaravelResilience
 {
@@ -64,6 +69,90 @@ final class LaravelResilience
     public function cache(?string $store = null): ContainerFaultBuilder
     {
         return $this->for($store === null ? 'cache' : sprintf('cache::%s', $store));
+    }
+
+    public function assertDegradedButSuccessful(TestResponse $response, ?callable $assertDegradedSignal = null): void
+    {
+        $response->assertSuccessful();
+
+        if ($assertDegradedSignal === null) {
+            return;
+        }
+
+        $result = $assertDegradedSignal($response);
+
+        if (is_bool($result)) {
+            Assert::assertTrue($result, 'Expected degraded response signal assertion to pass.');
+        }
+    }
+
+    public function assertEventDispatched(string $event, ?callable $callback = null, ?int $times = null): void
+    {
+        Event::assertDispatched($event, $callback);
+
+        if ($times !== null) {
+            Event::assertDispatchedTimes($event, $times);
+        }
+    }
+
+    public function assertFallbackUsed(mixed $actual, mixed $expected, string $description = 'fallback value'): void
+    {
+        Assert::assertEquals(
+            $expected,
+            $actual,
+            sprintf('Expected %s to match the configured fallback.', $description)
+        );
+    }
+
+    public function assertJobDispatched(string $job, ?callable $callback = null, ?int $times = null): void
+    {
+        Bus::assertDispatched($job, $callback);
+
+        if ($times !== null) {
+            Bus::assertDispatchedTimes($job, $times);
+        }
+    }
+
+    public function assertLogWritten(string $level, string|callable|null $message = null): void
+    {
+        $logger = Log::getFacadeRoot();
+
+        if (! is_object($logger) || ! method_exists($logger, 'shouldHaveReceived')) {
+            Assert::fail('Log assertions require calling Log::spy() before exercising the code under test.');
+        }
+
+        $expectation = $logger->shouldHaveReceived($level);
+
+        if (is_string($message)) {
+            $expectation->withArgs(
+                fn (mixed $loggedMessage, mixed ...$rest): bool => $loggedMessage === $message
+            );
+
+            return;
+        }
+
+        if ($message !== null) {
+            $expectation->withArgs(
+                fn (mixed ...$arguments): bool => (bool) $message(...$arguments)
+            );
+        }
+    }
+
+    public function assertNoDuplicateSideEffects(
+        int $actualCount,
+        int $expectedCount = 1,
+        string $description = 'side effect'
+    ): void {
+        Assert::assertSame(
+            $expectedCount,
+            $actualCount,
+            sprintf(
+                'Expected %s to occur exactly %d time(s), but it occurred %d time(s).',
+                $description,
+                $expectedCount,
+                $actualCount
+            )
+        );
     }
 
     public function ensureCanActivate(string $subject = 'Laravel Resilience'): void

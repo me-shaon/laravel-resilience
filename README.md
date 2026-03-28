@@ -4,7 +4,7 @@ Laravel-native resilience testing and fault injection for application-level fail
 
 ## Status
 
-The package is in active development. The baseline package bootstrapping, rule-based fault model, and first container-based injection path are now in place.
+The package is in active development. The baseline package bootstrapping, rule-based fault model, container and Laravel-native fault injection, and the first assertion helpers are now in place.
 
 ## Compatibility
 
@@ -68,6 +68,36 @@ Resilience::storage('s3')->timeout();
 ```
 
 That means `Cache::store('redis')`, `Mail::mailer('ses')`, `Queue::connection('redis')`, and `Storage::disk('s3')` can be faulted independently without affecting the default store, mailer, connection, or disk.
+
+## Assertion helpers
+
+Phase 5 adds a small assertion layer to keep resilience tests readable while still working with Laravel's normal testing tools:
+
+```php
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use MeShaon\LaravelResilience\Facades\Resilience;
+
+Log::spy();
+Event::fake();
+Bus::fake();
+
+Resilience::assertFallbackUsed($responseSource, 'cache', 'response source fallback');
+Resilience::assertLogWritten('warning', 'Cache fallback used.');
+Resilience::assertEventDispatched(App\Events\CacheFallbackTriggered::class, times: 1);
+Resilience::assertJobDispatched(App\Jobs\NotifyOps::class, times: 1);
+Resilience::assertNoDuplicateSideEffects($writeCount, description: 'inventory write');
+```
+
+For degraded but still successful responses, combine your normal Laravel response checks with:
+
+```php
+Resilience::assertDegradedButSuccessful(
+    $response,
+    fn ($response) => $response->headers->get('X-Resilience-Degraded') === 'true'
+);
+```
 
 ## Installation
 

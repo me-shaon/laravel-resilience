@@ -3,6 +3,7 @@
 namespace MeShaon\LaravelResilience\Facades;
 
 use Illuminate\Support\Facades\Facade;
+use Illuminate\Testing\TestResponse;
 use MeShaon\LaravelResilience\ContainerFaultBuilder;
 use MeShaon\LaravelResilience\Faults\FaultRule;
 use MeShaon\LaravelResilience\Faults\FaultScope;
@@ -14,6 +15,12 @@ use MeShaon\LaravelResilience\LaravelResilience;
  *
  * @method static FaultRule activate(FaultRule $rule)
  * @method static array<int, FaultRule> activeFaults()
+ * @method static void assertDegradedButSuccessful(TestResponse $response, ?callable $assertDegradedSignal = null)
+ * @method static void assertEventDispatched(string $event, ?callable $callback = null, ?int $times = null)
+ * @method static void assertFallbackUsed(mixed $actual, mixed $expected, string $description = 'fallback value')
+ * @method static void assertJobDispatched(string $job, ?callable $callback = null, ?int $times = null)
+ * @method static void assertLogWritten(string $level, string|callable|null $message = null)
+ * @method static void assertNoDuplicateSideEffects(int $actualCount, int $expectedCount = 1, string $description = 'side effect')
  * @method static ContainerFaultBuilder cache(?string $store = null)
  * @method static bool enabled()
  * @method static bool canActivate()
