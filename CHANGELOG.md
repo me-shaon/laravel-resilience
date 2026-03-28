@@ -2,6 +2,34 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.3.0 - 2026-03-28
+
+### v0.3.0
+
+#### Summary
+
+- Adds a discovery scanner that helps developers find resilience-relevant code paths before they have written many resilience tests.
+
+#### Highlights
+
+- Added `php artisan resilience:discover` for scanning application code.
+- Added readable and JSON discovery reports with category, file, line, and excerpt details.
+- Added detection for practical resilience-sensitive patterns such as HTTP calls, mail sends, queue dispatches, storage writes, cache usage, direct client construction, and concrete client coupling.
+- Added fixture-based scanner and command tests.
+- Expanded the README with clearer discovery scanner guidance and example output.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- composer format -- --test
+
+#### Full Changelog
+
+- 6631855 Add resilience discovery scanner
+- d33647c Update CHANGELOG
+
 ## v0.2.1 - 2026-03-28
 
 ### v0.2.1
