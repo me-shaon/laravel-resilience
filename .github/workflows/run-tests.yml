@@ -138,12 +138,15 @@ jobs:
           echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
 
       - name: Install dependencies
+        shell: bash
         run: |
           composer require --dev "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" "pestphp/pest:${{ matrix.pest }}" "pestphp/pest-plugin-laravel:${{ matrix.pest-plugin-laravel }}" "pestphp/pest-plugin-arch:${{ matrix.pest-plugin-arch }}" "nunomaduro/collision:${{ matrix.collision }}" "larastan/larastan:${{ matrix.larastan }}" --no-interaction --no-update
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
       - name: List Installed Dependencies
+        shell: bash
         run: composer show -D
 
       - name: Execute tests
+        shell: bash
         run: vendor/bin/pest --ci
