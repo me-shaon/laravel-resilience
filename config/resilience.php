@@ -20,4 +20,13 @@ return [
     'scenarios' => [
         // 'search-fallback' => \App\Resilience\SearchFallbackScenario::class,
     ],
+
+    /*
+     * Default paths for resilience discovery scans. The discovery command
+     * scans the application path by default, but these values document the
+     * expected source locations for future expansion.
+     */
+    'discovery' => [
+        'paths' => ['app'],
+    ],
 ];

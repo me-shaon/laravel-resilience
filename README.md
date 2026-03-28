@@ -188,6 +188,73 @@ php artisan resilience:run search-fallback --json
 
 The JSON output is helpful if you want to inspect the result programmatically or feed it into later automation and reporting.
 
+## Discovery scanner
+
+Laravel Resilience also includes a discovery command for finding resilience-relevant code patterns before you have written many tests.
+
+Use it when you want a quick review of code paths that are likely good candidates for:
+
+- resilience tests
+- fault injection coverage
+- abstraction behind contracts or services
+- follow-up architectural review
+
+Run the scanner with:
+
+```bash
+php artisan resilience:discover
+```
+
+You can also scan a specific path:
+
+```bash
+php artisan resilience:discover app/Services
+```
+
+Or request structured output:
+
+```bash
+php artisan resilience:discover --json
+```
+
+The scanner currently looks for practical patterns such as:
+
+- outbound HTTP calls
+- mail send points
+- queue dispatches
+- storage writes
+- cache usage
+- direct construction of external-style clients
+- constructors coupled to concrete client or gateway classes
+
+Example output:
+
+```text
+Laravel Resilience discovery findings
+Scanned path: /project/app
+Files scanned: 18
+Findings: 4
+
+http:
+- Outbound HTTP call through the Laravel HTTP client. [app/Services/BillingService.php:18]
+
+queue:
+- Queue or bus dispatch point. [app/Listeners/SendInvoiceListener.php:27]
+
+client-construction:
+- Direct construction of an external-style client. [app/Services/SearchService.php:14]
+```
+
+The scanner is intentionally heuristic-based. It does not try to prove that code is wrong. Instead, it highlights places that are often resilience-sensitive and worth reviewing.
+
+So the output should be read as:
+
+- "this code path probably deserves resilience attention"
+
+not:
+
+- "this code is definitely broken"
+
 ## Installation
 
 Install the package with Composer:
