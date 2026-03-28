@@ -2,6 +2,12 @@
 
 namespace MeShaon\LaravelResilience;
 
+use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use MeShaon\LaravelResilience\Faults\FaultManager;
 use MeShaon\LaravelResilience\Faults\FaultRule;
 use MeShaon\LaravelResilience\Faults\FaultScope;
@@ -11,6 +17,17 @@ use MeShaon\LaravelResilience\Support\EnvironmentGuard;
 
 final class LaravelResilience
 {
+    /**
+     * @var array<string, array{facade: class-string, accessor: string}>
+     */
+    private const FACADE_TARGETS = [
+        HttpFactory::class => ['facade' => Http::class, 'accessor' => HttpFactory::class],
+        'mail.manager' => ['facade' => Mail::class, 'accessor' => 'mail.manager'],
+        'cache' => ['facade' => Cache::class, 'accessor' => 'cache'],
+        'queue' => ['facade' => Queue::class, 'accessor' => 'queue'],
+        'filesystem' => ['facade' => Storage::class, 'accessor' => 'filesystem'],
+    ];
+
     public function __construct(
         private readonly EnvironmentGuard $environmentGuard,
         private readonly FaultManager $faultManager,
@@ -21,6 +38,7 @@ final class LaravelResilience
     {
         $this->ensureCanActivate(sprintf('Fault rule [%s]', $rule->name()));
         $this->containerFaultInjector->activate($rule);
+        $this->refreshFacadeTarget($rule->target());
 
         return $this->faultManager->activate($rule);
     }
@@ -43,6 +61,11 @@ final class LaravelResilience
         return $this->environmentGuard->canActivate();
     }
 
+    public function cache(?string $store = null): ContainerFaultBuilder
+    {
+        return $this->for($store === null ? 'cache' : sprintf('cache::%s', $store));
+    }
+
     public function ensureCanActivate(string $subject = 'Laravel Resilience'): void
     {
         $this->environmentGuard->ensureCanActivate($subject);
@@ -53,9 +76,34 @@ final class LaravelResilience
         return $this->environmentGuard->currentEnvironment();
     }
 
+    public function filesystem(?string $disk = null): ContainerFaultBuilder
+    {
+        return $this->for($disk === null ? 'filesystem' : sprintf('filesystem::%s', $disk));
+    }
+
     public function for(string $abstract): ContainerFaultBuilder
     {
         return new ContainerFaultBuilder($this, $abstract);
+    }
+
+    public function http(): ContainerFaultBuilder
+    {
+        return $this->for(HttpFactory::class);
+    }
+
+    public function mail(?string $mailer = null): ContainerFaultBuilder
+    {
+        return $this->for($mailer === null ? 'mail.manager' : sprintf('mail.manager::%s', $mailer));
+    }
+
+    public function queue(?string $connection = null): ContainerFaultBuilder
+    {
+        return $this->for($connection === null ? 'queue' : sprintf('queue::%s', $connection));
+    }
+
+    public function storage(?string $disk = null): ContainerFaultBuilder
+    {
+        return $this->filesystem($disk);
     }
 
     public function deactivate(FaultTarget $target): void
@@ -63,7 +111,12 @@ final class LaravelResilience
         $this->faultManager->deactivate($target);
 
         if ($target->type() === 'container') {
-            $this->containerFaultInjector->restore($target->name());
+            $abstract = $this->containerFaultInjector->baseAbstract($target->name());
+
+            if (! $this->faultManager->hasContainerRulesFor($abstract)) {
+                $this->containerFaultInjector->restore($abstract);
+                $this->refreshFacadeTarget(FaultTarget::container($abstract));
+            }
         }
     }
 
@@ -71,6 +124,7 @@ final class LaravelResilience
     {
         $this->containerFaultInjector->restoreAll();
         $this->faultManager->deactivateAll();
+        $this->refreshAllFacadeTargets();
     }
 
     public function deactivateScope(FaultScope $scope): void
@@ -86,7 +140,12 @@ final class LaravelResilience
         $this->faultManager->deactivateScope($scope);
 
         foreach ($activeContainerTargets as $abstract) {
-            $this->containerFaultInjector->restore($abstract);
+            $baseAbstract = $this->containerFaultInjector->baseAbstract($abstract);
+
+            if (! $this->faultManager->hasContainerRulesFor($baseAbstract)) {
+                $this->containerFaultInjector->restore($baseAbstract);
+                $this->refreshFacadeTarget(FaultTarget::container($baseAbstract));
+            }
         }
     }
 
@@ -116,5 +175,28 @@ final class LaravelResilience
     public function triggeredFault(FaultTarget $target, int $attempt): ?FaultRule
     {
         return $this->faultManager->ruleForAttempt($target, $attempt);
+    }
+
+    private function refreshAllFacadeTargets(): void
+    {
+        foreach (array_keys(self::FACADE_TARGETS) as $abstract) {
+            $this->refreshFacadeTarget(FaultTarget::container($abstract));
+        }
+    }
+
+    private function refreshFacadeTarget(FaultTarget $target): void
+    {
+        if ($target->type() !== 'container') {
+            return;
+        }
+
+        $abstract = $this->containerFaultInjector->baseAbstract($target->name());
+        $definition = self::FACADE_TARGETS[$abstract] ?? null;
+
+        if ($definition === null) {
+            return;
+        }
+
+        $definition['facade']::clearResolvedInstance($definition['accessor']);
     }
 }

@@ -25,13 +25,13 @@ The package is in active development. The baseline package bootstrapping, rule-b
 
 ## Current model
 
-The package now has a simple Phase 2 + Phase 3 model:
+The package now has a simple Phase 2 + Phase 4 model:
 
 - a `FaultRule` describes the fault behavior we want
 - the `Resilience` registry keeps track of active rules and their attempt counts
-- the container wrapper applies those rules to container-managed services and restores the original binding when the rule is removed
+- the runtime wrapper applies those rules to container-managed services and Laravel-native targets, then restores the original binding when the rule is removed
 
-### Example
+### Container example
 
 ```php
 use MeShaon\LaravelResilience\Facades\Resilience;
@@ -48,12 +48,26 @@ Resilience::deactivateAll();
 
 In this example, Laravel Resilience wraps the `PaymentGateway` container binding, intercepts the method call, applies the active timeout rule, and then lets you restore the original binding with `deactivateAll()` or `deactivate(...)`.
 
-If you want lower-level control, you can still activate rules directly and ask whether they should trigger for a specific attempt, but the intended Phase 3 path is the fluent container API:
+Laravel-specific helpers are also available for the first integration set:
 
 ```php
-Resilience::for(PaymentGateway::class)->timeout();
-Resilience::for(SearchClient::class)->process()->exception(new RuntimeException('Search is down.'));
+Resilience::http()->timeout();
+Resilience::mail()->exception(new RuntimeException('Mail is down.'));
+Resilience::cache()->latency(40);
+Resilience::queue()->exception(new RuntimeException('Queue is down.'));
+Resilience::storage()->latency(40);
 ```
+
+Those helpers can also target named Laravel drivers when the application code uses them explicitly:
+
+```php
+Resilience::cache('redis')->latency(40);
+Resilience::mail('ses')->exception(new RuntimeException('SES is down.'));
+Resilience::queue('redis')->exception(new RuntimeException('Redis queue is down.'));
+Resilience::storage('s3')->timeout();
+```
+
+That means `Cache::store('redis')`, `Mail::mailer('ses')`, `Queue::connection('redis')`, and `Storage::disk('s3')` can be faulted independently without affecting the default store, mailer, connection, or disk.
 
 ## Installation
 

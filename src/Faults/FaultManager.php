@@ -30,6 +30,19 @@ final class FaultManager
         return array_values($this->rules);
     }
 
+    public function hasContainerRulesFor(string $abstract): bool
+    {
+        $prefix = $abstract.'::';
+
+        foreach (array_keys($this->rules) as $targetKey) {
+            if ($targetKey === 'container:'.$abstract || str_starts_with($targetKey, 'container:'.$prefix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function deactivate(FaultTarget $target): void
     {
         unset($this->rules[$target->key()]);

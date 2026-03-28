@@ -21,6 +21,16 @@ use Throwable;
 final class ContainerFaultInjector
 {
     /**
+     * @var array<string, list<string>>
+     */
+    private const NAMED_DRIVER_METHODS = [
+        'cache' => ['store', 'driver'],
+        'mail.manager' => ['mailer', 'driver'],
+        'queue' => ['connection'],
+        'filesystem' => ['disk', 'drive'],
+    ];
+
+    /**
      * @var array<string, array{
      *     alias: string,
      *     originally_bound: bool,
@@ -42,7 +52,14 @@ final class ContainerFaultInjector
         }
 
         $this->ensureSupportedRule($rule);
-        $this->instrument($rule->target()->name());
+        $this->instrument($this->baseAbstract($rule->target()->name()));
+    }
+
+    public function baseAbstract(string $target): string
+    {
+        return str_contains($target, '::')
+            ? explode('::', $target, 2)[0]
+            : $target;
     }
 
     public function restore(string $abstract): void
@@ -145,6 +162,7 @@ final class ContainerFaultInjector
             return $this->createProxy(
                 $target,
                 $abstract,
+                get_class($target),
                 fn (object $resolvedTarget, string $method, array $arguments): mixed => $this->invoke(
                     $abstract,
                     $resolvedTarget,
@@ -175,16 +193,38 @@ final class ContainerFaultInjector
     {
         $rule = $this->faultManager->triggeredRule(FaultTarget::container($abstract));
 
-        if ($rule === null) {
+        if ($rule !== null) {
+            return match ($rule->type()) {
+                FaultType::Exception,
+                FaultType::Timeout => throw $this->exceptionFor($rule),
+                FaultType::Latency => $this->invokeWithLatency($target, $method, $arguments, $rule->latencyInMilliseconds() ?? 0),
+                default => $this->callTarget($target, $method, $arguments),
+            };
+        }
+
+        $namedRule = $this->matchingNamedRule($abstract, $method, $arguments);
+
+        if ($namedRule === null) {
             return $this->callTarget($target, $method, $arguments);
         }
 
-        return match ($rule->type()) {
-            FaultType::Exception,
-            FaultType::Timeout => throw $this->exceptionFor($rule),
-            FaultType::Latency => $this->invokeWithLatency($target, $method, $arguments, $rule->latencyInMilliseconds() ?? 0),
-            default => $this->callTarget($target, $method, $arguments),
-        };
+        $resolvedTarget = $this->callTarget($target, $method, $arguments);
+
+        if (! is_object($resolvedTarget)) {
+            return $resolvedTarget;
+        }
+
+        return $this->createProxy(
+            $resolvedTarget,
+            $namedRule->target()->name(),
+            get_class($resolvedTarget),
+            fn (object $proxyTarget, string $proxyMethod, array $proxyArguments): mixed => $this->invokeNamedRule(
+                $namedRule,
+                $proxyTarget,
+                $proxyMethod,
+                $proxyArguments
+            )
+        );
     }
 
     private function invokeWithLatency(object $target, string $method, array $arguments, int $latencyInMilliseconds): mixed
@@ -207,6 +247,39 @@ final class ContainerFaultInjector
                 $rule->name(),
                 $rule->type()->value
             ));
+    }
+
+    private function invokeNamedRule(FaultRule $rule, object $target, string $method, array $arguments): mixed
+    {
+        $triggeredRule = $this->faultManager->triggeredRule($rule->target());
+
+        if ($triggeredRule === null) {
+            return $this->callTarget($target, $method, $arguments);
+        }
+
+        return match ($triggeredRule->type()) {
+            FaultType::Exception,
+            FaultType::Timeout => throw $this->exceptionFor($triggeredRule),
+            FaultType::Latency => $this->invokeWithLatency($target, $method, $arguments, $triggeredRule->latencyInMilliseconds() ?? 0),
+            default => $this->callTarget($target, $method, $arguments),
+        };
+    }
+
+    private function matchingNamedRule(string $abstract, string $method, array $arguments): ?FaultRule
+    {
+        $namedMethodSet = self::NAMED_DRIVER_METHODS[$abstract] ?? null;
+
+        if ($namedMethodSet === null || ! in_array($method, $namedMethodSet, true)) {
+            return null;
+        }
+
+        $name = $arguments[0] ?? null;
+
+        if (! is_string($name) || trim($name) === '') {
+            return null;
+        }
+
+        return $this->faultManager->ruleFor(FaultTarget::container(sprintf('%s::%s', $abstract, $name)));
     }
 
     /**
@@ -267,9 +340,9 @@ final class ContainerFaultInjector
     /**
      * @throws ReflectionException
      */
-    private function createProxy(object $target, string $abstract, callable $interceptor): object
+    private function createProxy(object $target, string $abstract, string $proxyableClass, callable $interceptor): object
     {
-        $proxyClass = $this->proxyClassFor($abstract);
+        $proxyClass = $this->proxyClassFor($abstract, $proxyableClass);
 
         return new $proxyClass($target, \Closure::fromCallable($interceptor));
     }
@@ -277,20 +350,21 @@ final class ContainerFaultInjector
     /**
      * @throws ReflectionException
      */
-    private function proxyClassFor(string $abstract): string
+    private function proxyClassFor(string $abstract, string $proxyableClass): string
     {
-        $className = 'LaravelResilienceProxy_'.sha1($abstract);
+        $className = 'LaravelResilienceProxy_'.sha1($abstract.'|'.$proxyableClass);
 
         if (class_exists($className, false)) {
             return $className;
         }
 
-        $reflection = new ReflectionClass($abstract);
+        $reflection = new ReflectionClass($proxyableClass);
 
         if ($reflection->isFinal()) {
             throw InvalidFaultConfiguration::because(sprintf(
-                'Container target [%s] cannot be proxied because it is final.',
-                $abstract
+                'Container target [%s] cannot be proxied because resolved class [%s] is final.',
+                $abstract,
+                $proxyableClass
             ));
         }
 
@@ -302,16 +376,15 @@ final class ContainerFaultInjector
         foreach ($methods as $method) {
             if ($method->isFinal()) {
                 throw InvalidFaultConfiguration::because(sprintf(
-                    'Container target [%s] cannot be proxied because method [%s] is final.',
+                    'Container target [%s] cannot be proxied because resolved class [%s] has final method [%s].',
                     $abstract,
+                    $proxyableClass,
                     $method->getName()
                 ));
             }
         }
 
-        $targetDeclaration = $reflection->isInterface()
-            ? 'implements \\'.$abstract
-            : 'extends \\'.$abstract;
+        $targetDeclaration = 'extends \\'.$proxyableClass;
 
         $methodCode = implode("\n\n    ", array_map(
             fn (ReflectionMethod $method): string => $this->buildMethodCode($method),
