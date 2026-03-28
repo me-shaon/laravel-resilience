@@ -2,6 +2,31 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.1.1 - 2026-03-28
+
+### v0.1.1
+
+#### Summary
+
+- Patch release for Laravel Resilience fixing a CI-only failure in the HTTP facade timeout test.
+
+#### Highlights
+
+- Updated the HTTP facade timeout test to avoid Laravel's fake response promise path.
+- Removed the test's implicit dependency on `guzzlehttp/promises` for matrix rows where that package was not present.
+- Kept the test coverage intent the same: the timeout fault still triggers before any HTTP request is allowed through.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- composer format -- --test
+
+#### Full Changelog
+
+- 13afecf Fix HTTP facade timeout test without Guzzle promises
+
 ## v0.1.0 - 2026-03-28
 
 ### v0.1.0
