@@ -2,6 +2,31 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.2.1 - 2026-03-28
+
+### v0.2.1
+
+#### Summary
+
+- Patch release for Laravel Resilience fixing a flaky CI interaction in the scenario command test suite.
+
+#### Highlights
+
+- Removed an unnecessary log spy from the scenario command success test.
+- Stabilized the scenario command test path across CI run orders.
+- Kept the scenario runner behavior unchanged while preserving the existing logging assertions in the runner tests.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- composer format -- --test
+
+#### Full Changelog
+
+- 401e70b Stabilize scenario command logging test
+
 ## v0.2.0 - 2026-03-28
 
 ### v0.2.0
