@@ -2,8 +2,10 @@
 
 namespace MeShaon\LaravelResilience;
 
+use MeShaon\LaravelResilience\Commands\RunResilienceScenarioCommand;
 use MeShaon\LaravelResilience\Faults\FaultManager;
 use MeShaon\LaravelResilience\Faults\Injectors\ContainerFaultInjector;
+use MeShaon\LaravelResilience\Scenarios\ScenarioRunner;
 use MeShaon\LaravelResilience\Support\EnvironmentGuard;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -14,7 +16,8 @@ class LaravelResilienceServiceProvider extends PackageServiceProvider
     {
         $package
             ->name('laravel-resilience')
-            ->hasConfigFile();
+            ->hasConfigFile()
+            ->hasCommand(RunResilienceScenarioCommand::class);
     }
 
     public function packageRegistered(): void
@@ -22,6 +25,7 @@ class LaravelResilienceServiceProvider extends PackageServiceProvider
         $this->app->singleton(EnvironmentGuard::class);
         $this->app->singleton(FaultManager::class);
         $this->app->singleton(ContainerFaultInjector::class);
+        $this->app->singleton(ScenarioRunner::class);
 
         $this->app->singleton(
             'resilience',

@@ -4,7 +4,7 @@ Laravel-native resilience testing and fault injection for application-level fail
 
 ## Status
 
-The package is in active development. The baseline package bootstrapping, rule-based fault model, container and Laravel-native fault injection, and the first assertion helpers are now in place.
+The package is in active development. The baseline package bootstrapping, rule-based fault model, container and Laravel-native fault injection, assertion helpers, and scenario runner are now in place.
 
 ## Compatibility
 
@@ -25,7 +25,7 @@ The package is in active development. The baseline package bootstrapping, rule-b
 
 ## Current model
 
-The package now has a simple Phase 2 + Phase 4 model:
+The package currently works around a few simple ideas:
 
 - a `FaultRule` describes the fault behavior we want
 - the `Resilience` registry keeps track of active rules and their attempt counts
@@ -71,7 +71,7 @@ That means `Cache::store('redis')`, `Mail::mailer('ses')`, `Queue::connection('r
 
 ## Assertion helpers
 
-Phase 5 adds a small assertion layer to keep resilience tests readable while still working with Laravel's normal testing tools:
+Laravel Resilience includes a small assertion layer to keep resilience tests readable while still working with Laravel's normal testing tools:
 
 ```php
 use Illuminate\Support\Facades\Bus;
@@ -98,6 +98,95 @@ Resilience::assertDegradedButSuccessful(
     fn ($response) => $response->headers->get('X-Resilience-Degraded') === 'true'
 );
 ```
+
+## Scenario runner
+
+The scenario runner lets you define named resilience exercises and run them from Artisan.
+
+A scenario is useful when you want to:
+
+- activate one or more fault rules
+- execute a real application workflow while those faults are active
+- capture a structured result
+- rerun the same resilience experiment by name later
+
+Define scenarios in `config/resilience.php`:
+
+```php
+'scenarios' => [
+    'search-fallback' => App\Resilience\SearchFallbackScenario::class,
+],
+```
+
+Each scenario class should implement `MeShaon\LaravelResilience\Scenarios\ResilienceScenario`, return the fault rules it wants to activate, and provide a `run()` method.
+
+Example:
+
+```php
+<?php
+
+namespace App\Resilience;
+
+use App\Contracts\PaymentGateway;
+use MeShaon\LaravelResilience\Faults\FaultRule;
+use MeShaon\LaravelResilience\Faults\FaultTarget;
+use MeShaon\LaravelResilience\Scenarios\ResilienceScenario;
+use RuntimeException;
+
+final class PaymentFallbackScenario implements ResilienceScenario
+{
+    public function description(): string
+    {
+        return 'Forces the payment gateway to timeout and verifies the fallback path.';
+    }
+
+    public function faultRules(): array
+    {
+        return [
+            FaultRule::timeout('payment-timeout', FaultTarget::container(PaymentGateway::class)),
+        ];
+    }
+
+    public function run(): array
+    {
+        try {
+            app(PaymentGateway::class)->charge(500);
+
+            return ['fallback_used' => false];
+        } catch (RuntimeException $exception) {
+            return [
+                'fallback_used' => true,
+                'message' => $exception->getMessage(),
+            ];
+        }
+    }
+}
+```
+
+When you run this scenario, Laravel Resilience will:
+
+1. resolve the configured scenario by name
+2. verify that fault activation is allowed in the current environment
+3. activate the scenario's fault rules
+4. execute the scenario's `run()` method
+5. collect a result report and log entry
+6. clean up the active faults afterward
+
+Run a configured scenario with Artisan:
+
+```bash
+php artisan resilience:run search-fallback
+```
+
+That command is useful for repeatable resilience drills, local debugging, and shared team experiments. Instead of rebuilding fault setup manually, you can rerun the same named workflow whenever you need it.
+
+For structured output:
+
+```bash
+php artisan resilience:run search-fallback --json
+```
+
+The JSON output is helpful if you want to inspect the result programmatically or feed it into later automation and reporting.
 
 ## Installation
 
