@@ -6,18 +6,21 @@ use MeShaon\LaravelResilience\Faults\FaultManager;
 use MeShaon\LaravelResilience\Faults\FaultRule;
 use MeShaon\LaravelResilience\Faults\FaultScope;
 use MeShaon\LaravelResilience\Faults\FaultTarget;
+use MeShaon\LaravelResilience\Faults\Injectors\ContainerFaultInjector;
 use MeShaon\LaravelResilience\Support\EnvironmentGuard;
 
 final class LaravelResilience
 {
     public function __construct(
         private readonly EnvironmentGuard $environmentGuard,
-        private readonly FaultManager $faultManager
+        private readonly FaultManager $faultManager,
+        private readonly ContainerFaultInjector $containerFaultInjector
     ) {}
 
     public function activate(FaultRule $rule): FaultRule
     {
         $this->ensureCanActivate(sprintf('Fault rule [%s]', $rule->name()));
+        $this->containerFaultInjector->activate($rule);
 
         return $this->faultManager->activate($rule);
     }
@@ -50,19 +53,41 @@ final class LaravelResilience
         return $this->environmentGuard->currentEnvironment();
     }
 
+    public function for(string $abstract): ContainerFaultBuilder
+    {
+        return new ContainerFaultBuilder($this, $abstract);
+    }
+
     public function deactivate(FaultTarget $target): void
     {
         $this->faultManager->deactivate($target);
+
+        if ($target->type() === 'container') {
+            $this->containerFaultInjector->restore($target->name());
+        }
     }
 
     public function deactivateAll(): void
     {
+        $this->containerFaultInjector->restoreAll();
         $this->faultManager->deactivateAll();
     }
 
     public function deactivateScope(FaultScope $scope): void
     {
+        $activeContainerTargets = array_map(
+            fn (FaultRule $rule): string => $rule->target()->name(),
+            array_filter(
+                $this->faultManager->activeRules(),
+                fn (FaultRule $rule): bool => $rule->scope() === $scope && $rule->target()->type() === 'container'
+            )
+        );
+
         $this->faultManager->deactivateScope($scope);
+
+        foreach ($activeContainerTargets as $abstract) {
+            $this->containerFaultInjector->restore($abstract);
+        }
     }
 
     public function faultFor(FaultTarget $target): ?FaultRule

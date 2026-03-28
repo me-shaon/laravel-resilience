@@ -3,6 +3,7 @@
 namespace MeShaon\LaravelResilience;
 
 use MeShaon\LaravelResilience\Faults\FaultManager;
+use MeShaon\LaravelResilience\Faults\Injectors\ContainerFaultInjector;
 use MeShaon\LaravelResilience\Support\EnvironmentGuard;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -20,12 +21,14 @@ class LaravelResilienceServiceProvider extends PackageServiceProvider
     {
         $this->app->singleton(EnvironmentGuard::class);
         $this->app->singleton(FaultManager::class);
+        $this->app->singleton(ContainerFaultInjector::class);
 
         $this->app->singleton(
             'resilience',
             fn (): LaravelResilience => new LaravelResilience(
                 $this->app->make(EnvironmentGuard::class),
-                $this->app->make(FaultManager::class)
+                $this->app->make(FaultManager::class),
+                $this->app->make(ContainerFaultInjector::class)
             )
         );
 

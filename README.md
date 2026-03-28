@@ -4,7 +4,7 @@ Laravel-native resilience testing and fault injection for application-level fail
 
 ## Status
 
-The package is in active bootstrap. Phase 0 establishes the real package baseline before the v1 feature work begins.
+The package is in active development. The baseline package bootstrapping, rule-based fault model, and first container-based injection path are now in place.
 
 ## Compatibility
 
@@ -23,41 +23,37 @@ The package is in active bootstrap. Phase 0 establishes the real package baselin
 - resilience-oriented assertions for fallbacks, logs, events, jobs, and duplicate side effects
 - discovery tooling that highlights resilience-sensitive touchpoints and suggests practical improvements
 
-## Current fault model
+## Current model
 
-Phase 2 uses a simple rule-based model:
+The package now has a simple Phase 2 + Phase 3 model:
 
-- a `FaultTarget` identifies what we want to affect
-- a `FaultRule` describes the fault behavior and when it should trigger
-- the `Resilience` registry stores active rules and answers whether a rule should fire for a given attempt
+- a `FaultRule` describes the fault behavior we want
+- the `Resilience` registry keeps track of active rules and their attempt counts
+- the container wrapper applies those rules to container-managed services and restores the original binding when the rule is removed
 
 ### Example
 
 ```php
 use MeShaon\LaravelResilience\Facades\Resilience;
-use MeShaon\LaravelResilience\Faults\FaultRule;
-use MeShaon\LaravelResilience\Faults\FaultScope;
-use MeShaon\LaravelResilience\Faults\FaultTarget;
+use App\Contracts\PaymentGateway;
 
-$target = FaultTarget::container('payment-gateway');
+Resilience::for(PaymentGateway::class)->timeout();
 
-$rule = FaultRule::failFirst(
-    name: 'payment-gateway-fails-twice',
-    target: $target,
-    attempts: 2,
-    scope: FaultScope::Test,
-);
+$gateway = app(PaymentGateway::class);
 
-Resilience::activate($rule);
+$gateway->charge(500); // throws RuntimeException('Operation timed out.')
 
-Resilience::shouldActivate($target, 1); // true
-Resilience::shouldActivate($target, 2); // true
-Resilience::shouldActivate($target, 3); // false
-
-Resilience::deactivate($target);
+Resilience::deactivateAll();
 ```
 
-In this example, the rule is active only for the first two attempts against the `payment-gateway` target. Phase 2 only decides whether the rule should fire; later phases will connect that decision to real container and Laravel integration hooks.
+In this example, Laravel Resilience wraps the `PaymentGateway` container binding, intercepts the method call, applies the active timeout rule, and then lets you restore the original binding with `deactivateAll()` or `deactivate(...)`.
+
+If you want lower-level control, you can still activate rules directly and ask whether they should trigger for a specific attempt, but the intended Phase 3 path is the fluent container API:
+
+```php
+Resilience::for(PaymentGateway::class)->timeout();
+Resilience::for(SearchClient::class)->process()->exception(new RuntimeException('Search is down.'));
+```
 
 ## Installation
 

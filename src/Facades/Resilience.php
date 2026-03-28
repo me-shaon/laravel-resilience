@@ -3,6 +3,7 @@
 namespace MeShaon\LaravelResilience\Facades;
 
 use Illuminate\Support\Facades\Facade;
+use MeShaon\LaravelResilience\ContainerFaultBuilder;
 use MeShaon\LaravelResilience\Faults\FaultRule;
 use MeShaon\LaravelResilience\Faults\FaultScope;
 use MeShaon\LaravelResilience\Faults\FaultTarget;
@@ -17,6 +18,7 @@ use MeShaon\LaravelResilience\LaravelResilience;
  * @method static bool canActivate()
  * @method static void ensureCanActivate(string $subject = 'Laravel Resilience')
  * @method static string currentEnvironment()
+ * @method static ContainerFaultBuilder for(string $abstract)
  * @method static void deactivate(FaultTarget $target)
  * @method static void deactivateAll()
  * @method static void deactivateScope(FaultScope $scope)

@@ -6,7 +6,7 @@ use MeShaon\LaravelResilience\Faults\FaultScope;
 use MeShaon\LaravelResilience\Faults\FaultTarget;
 
 it('supports scoped activation and deactivation', function () {
-    $testTarget = FaultTarget::container('payments');
+    $testTarget = FaultTarget::integration('payments');
     $processTarget = FaultTarget::integration('mail');
 
     $testRule = FaultRule::timeout(
@@ -37,7 +37,7 @@ it('supports scoped activation and deactivation', function () {
 });
 
 it('deactivates rules by target and can clear all active faults', function () {
-    $paymentTarget = FaultTarget::container('payments');
+    $paymentTarget = FaultTarget::integration('payments');
     $searchTarget = FaultTarget::integration('search');
 
     Resilience::activate(FaultRule::timeout('payment-timeout', $paymentTarget));
@@ -54,7 +54,7 @@ it('deactivates rules by target and can clear all active faults', function () {
 });
 
 it('evaluates fail-first and recover-after attempts deterministically', function () {
-    $target = FaultTarget::container('payment-gateway');
+    $target = FaultTarget::integration('payment-gateway');
 
     Resilience::activate(FaultRule::failFirst('fail-first', $target, 2));
 
