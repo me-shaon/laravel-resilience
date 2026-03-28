@@ -73,7 +73,7 @@ it('cleans up test-scoped container faults without touching process-scoped rules
 
 it('injects timeout faults into the HTTP client facade', function () {
     $factory = new HttpFactory;
-    $factory->fake(['*' => $factory->response(['ok' => true], 200)]);
+    $factory->preventStrayRequests();
 
     app()->instance(HttpFactory::class, $factory);
 
