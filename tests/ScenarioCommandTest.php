@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Log;
 use MeShaon\LaravelResilience\Tests\Fixtures\Payments\FakePaymentGateway;
 use MeShaon\LaravelResilience\Tests\Fixtures\Payments\PaymentGateway;
 use MeShaon\LaravelResilience\Tests\Fixtures\Scenarios\FailingSearchScenario;
@@ -10,8 +9,6 @@ use MeShaon\LaravelResilience\Tests\Fixtures\Search\FakeSearchClient;
 use MeShaon\LaravelResilience\Tests\Fixtures\Search\SearchClient;
 
 it('runs a configured scenario from artisan and prints a readable success report', function () {
-    Log::spy();
-
     app()->singleton(PaymentGateway::class, FakePaymentGateway::class);
 
     config()->set('resilience.scenarios', [
