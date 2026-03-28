@@ -2,6 +2,37 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.2.0 - 2026-03-28
+
+### v0.2.0
+
+#### Summary
+
+- Adds a configurable scenario runner so named resilience exercises can be executed from Artisan instead of only through ad hoc test setup.
+
+#### Highlights
+
+- Added a scenario contract, runner, and structured run report for reusable resilience workflows.
+- Added `php artisan resilience:run {scenario}` with optional `--json` output.
+- Added structured logging for scenario runs so results are visible and auditable.
+- Added tests for successful runs, failed runs, blocked environments, and command output.
+- Expanded the README with clearer scenario runner documentation and a concrete example.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- composer format -- --test
+
+#### Full Changelog
+
+- 60a6e84 Add scenario runner and command support
+- add3598 Update README installation instructions
+- dda8ff0 Update CHANGELOG
+- 6177f6b Merge remote-tracking branch 'origin/main'
+- a45bd28 Update CHANGELOG
+
 ## v0.1.1 - 2026-03-28
 
 ### v0.1.1
