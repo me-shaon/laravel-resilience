@@ -101,26 +101,18 @@ Resilience::assertDegradedButSuccessful(
 
 ## Installation
 
-Release tags are available from GitHub. Until Packagist publishing is set up, install the package from the repository:
-
-```json
-{
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/me-shaon/laravel-resilience"
-        }
-    ],
-    "require": {
-        "me-shaon/laravel-resilience": "^0.1"
-    }
-}
-```
-
-For local development, install dependencies with:
+Install the package with Composer:
 
 ```bash
-composer install
+composer require me-shaon/laravel-resilience
+```
+
+Laravel package discovery will register the service provider and facade automatically.
+
+If you want to customize the package safety defaults, publish the config file:
+
+```bash
+php artisan vendor:publish --tag="laravel-resilience-config"
 ```
 
 ## Testing
