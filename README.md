@@ -1,80 +1,245 @@
 # Laravel Resilience
 
-Laravel-native resilience testing and fault injection for application-level failure scenarios.
+Laravel Resilience is a Laravel package for simulating failures in the parts of your application you depend on, such as HTTP APIs, mail, queues, cache, storage, and container-managed services. It helps you verify fallbacks, degraded responses, retries, and duplicate-side-effect protections before real outages or slowdowns affect production.
+
+## Why use this package?
+
+Use Laravel Resilience when you want to:
+
+- force a timeout, exception, or slowdown in a dependency
+- test how your application behaves when a service is unavailable
+- make resilience tests easier to read with dedicated assertions
+- run repeatable resilience drills through Artisan commands
+- scan your codebase for resilience-sensitive areas and get follow-up suggestions
 
 ## Status
 
-The package is in active development. The baseline package bootstrapping, rule-based fault model, container and Laravel-native fault injection, assertion helpers, and scenario runner are now in place.
+The package is in active development.
+
+Available today:
+
+- fault injection for container-managed services
+- Laravel-aware helpers for HTTP, mail, cache, queue, and storage/filesystem
+- readable assertions for fallback-oriented tests
+- a scenario runner for repeatable resilience exercises
+- discovery and suggestion commands for finding resilience-sensitive code paths
+
+Current limitation:
+
+- container and Laravel integration proxies currently support `timeout`, `exception`, and `latency` rules
 
 ## Compatibility
 
 - PHP 8.1+
 - Laravel 10, 11, 12, and 13
 
-## Safety defaults
+## Installation
 
-- `RESILIENCE_ENABLED=true` keeps the package available by default
+Install the package with Composer:
+
+```bash
+composer require me-shaon/laravel-resilience
+```
+
+Laravel package discovery will register the service provider and facade automatically.
+
+If you want to customize the defaults, publish the config file:
+
+```bash
+php artisan vendor:publish --tag="laravel-resilience-config"
+```
+
+## Configuration and safety defaults
+
+Laravel Resilience is intentionally conservative.
+
+- `resilience.enabled` defaults to `true`
 - `resilience.blocked_environments` defaults to `['production']`
-- removing `'production'` from `resilience.blocked_environments` explicitly allows production activation
-- scenario runs are only treated as safe by default in `local` and `testing`
-- running scenarios in any other environment requires enabling `RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS=true` and passing `--confirm-non-local`
-- `php artisan resilience:run ... --dry-run` previews a scenario without activating faults or executing the scenario body
+- removing `'production'` from `resilience.blocked_environments` explicitly allows activation in production
+- scenario execution is treated as safe by default only in `local` and `testing`
+- running scenarios in another environment requires both `RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS=true` and `--confirm-non-local`
+- `--dry-run` lets you inspect a scenario without activating faults or running the scenario body
 
-## Planned capabilities
+Default config:
 
-- deterministic fault injection for container-managed services and Laravel integrations
-- resilience-oriented assertions for fallbacks, logs, events, jobs, and duplicate side effects
-- discovery tooling that highlights resilience-sensitive touchpoints and suggests practical improvements
+```php
+return [
+    'enabled' => (bool) env('RESILIENCE_ENABLED', true),
 
-## Current model
+    'blocked_environments' => ['production'],
 
-The package currently works around a few simple ideas:
+    'scenarios' => [
+        // 'search-fallback' => \App\Resilience\SearchFallbackScenario::class,
+    ],
 
-- a `FaultRule` describes the fault behavior we want
-- the `Resilience` registry keeps track of active rules and their attempt counts
-- the runtime wrapper applies those rules to container-managed services and Laravel-native targets, then restores the original binding when the rule is removed
+    'scenario_runner' => [
+        'safe_environments' => ['local', 'testing'],
+        'allow_non_local' => (bool) env('RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS', false),
+    ],
 
-### Container example
+    'discovery' => [
+        'paths' => ['app'],
+    ],
+];
+```
+
+You can inspect the current activation state at runtime:
 
 ```php
 use MeShaon\LaravelResilience\Facades\Resilience;
+
+$status = Resilience::activationStatus();
+```
+
+## Quick start
+
+The most common workflow is:
+
+1. activate a fault for a dependency
+2. run the code path you want to exercise
+3. assert that the application handled the failure well
+4. clean up the active fault
+
+Example:
+
+```php
 use App\Contracts\PaymentGateway;
+use Illuminate\Support\Facades\Log;
+use MeShaon\LaravelResilience\Facades\Resilience;
+
+Log::spy();
 
 Resilience::for(PaymentGateway::class)->timeout();
 
-$gateway = app(PaymentGateway::class);
+$result = rescue(
+    fn () => app(PaymentGateway::class)->charge(500),
+    function (): string {
+        Log::warning('Payment gateway timeout.');
 
-$gateway->charge(500); // throws RuntimeException('Operation timed out.')
+        return 'queued-for-retry';
+    },
+    report: false,
+);
+
+Resilience::assertFallbackUsed($result, 'queued-for-retry', 'payment fallback');
+Resilience::assertLogWritten('warning', fn (mixed $message): bool => $message === 'Payment gateway timeout.');
 
 Resilience::deactivateAll();
 ```
 
-In this example, Laravel Resilience wraps the `PaymentGateway` container binding, intercepts the method call, applies the active timeout rule, and then lets you restore the original binding with `deactivateAll()` or `deactivate(...)`.
+## Core concepts
 
-Laravel-specific helpers are also available for the first integration set:
+Laravel Resilience revolves around a few simple ideas:
+
+- `FaultRule`: describes the failure behavior you want to inject
+- `FaultTarget`: identifies what the rule applies to
+- `FaultScope`: controls whether a rule is test-scoped or process-scoped
+- `Resilience`: the facade used to activate, inspect, and deactivate rules
+
+For most usage, you will work through the facade builder:
 
 ```php
+Resilience::for(App\Contracts\PaymentGateway::class)->timeout();
+Resilience::mail()->exception(new \RuntimeException('Mail is down.'));
+Resilience::cache()->latency(50);
+```
+
+## Fault injection
+
+### Container-managed services
+
+If a service is resolved through Laravel's container, you can fault it directly:
+
+```php
+use App\Contracts\PaymentGateway;
+use MeShaon\LaravelResilience\Facades\Resilience;
+
+Resilience::for(PaymentGateway::class)->timeout();
+
+app(PaymentGateway::class)->charge(500); // throws RuntimeException('Operation timed out.')
+
+Resilience::deactivateAll();
+```
+
+Available fluent fault types for container injection:
+
+- `timeout()`
+- `exception(Throwable $exception)`
+- `latency(int $milliseconds)`
+
+Laravel Resilience wraps the target binding, intercepts method calls, applies the active rule, and restores the original binding when you deactivate the target or call `deactivateAll()`.
+
+### Laravel integrations
+
+The package also includes Laravel-aware shortcuts for common framework integrations:
+
+```php
+use MeShaon\LaravelResilience\Facades\Resilience;
+
 Resilience::http()->timeout();
-Resilience::mail()->exception(new RuntimeException('Mail is down.'));
+Resilience::mail()->exception(new \RuntimeException('Mail is down.'));
 Resilience::cache()->latency(40);
-Resilience::queue()->exception(new RuntimeException('Queue is down.'));
+Resilience::queue()->exception(new \RuntimeException('Queue is down.'));
 Resilience::storage()->latency(40);
 ```
 
-Those helpers can also target named Laravel drivers when the application code uses them explicitly:
+These helpers work with:
+
+- Laravel HTTP client
+- mail
+- cache
+- queue
+- storage/filesystem
+
+`Resilience::storage()` is an alias of `Resilience::filesystem()`.
+
+### Named drivers and connections
+
+You can target a specific store, mailer, queue connection, or disk without affecting the default one:
 
 ```php
+use MeShaon\LaravelResilience\Facades\Resilience;
+
 Resilience::cache('redis')->latency(40);
-Resilience::mail('ses')->exception(new RuntimeException('SES is down.'));
-Resilience::queue('redis')->exception(new RuntimeException('Redis queue is down.'));
+Resilience::mail('ses')->exception(new \RuntimeException('SES is down.'));
+Resilience::queue('redis')->exception(new \RuntimeException('Redis queue is down.'));
 Resilience::storage('s3')->timeout();
 ```
 
-That means `Cache::store('redis')`, `Mail::mailer('ses')`, `Queue::connection('redis')`, and `Storage::disk('s3')` can be faulted independently without affecting the default store, mailer, connection, or disk.
+That allows you to fault only:
+
+- `Cache::store('redis')`
+- `Mail::mailer('ses')`
+- `Queue::connection('redis')`
+- `Storage::disk('s3')`
+
+### Scope control
+
+Faults created through the fluent builder are test-scoped by default:
+
+```php
+Resilience::for(App\Contracts\SearchClient::class)->timeout();
+```
+
+If you want a process-scoped rule instead, use `process()`:
+
+```php
+Resilience::for(App\Contracts\SearchClient::class)
+    ->process()
+    ->exception(new \RuntimeException('Search is down.'));
+```
+
+You can clear only one scope when needed:
+
+```php
+use MeShaon\LaravelResilience\Faults\FaultScope;
+
+Resilience::deactivateScope(FaultScope::Test);
+```
 
 ## Assertion helpers
 
-Laravel Resilience includes a small assertion layer to keep resilience tests readable while still working with Laravel's normal testing tools:
+Laravel Resilience includes assertions for common resilience outcomes, so your tests can describe behavior instead of repeating low-level checks.
 
 ```php
 use Illuminate\Support\Facades\Bus;
@@ -93,7 +258,7 @@ Resilience::assertJobDispatched(App\Jobs\NotifyOps::class, times: 1);
 Resilience::assertNoDuplicateSideEffects($writeCount, description: 'inventory write');
 ```
 
-For degraded but still successful responses, combine your normal Laravel response checks with:
+For degraded but still successful HTTP responses:
 
 ```php
 Resilience::assertDegradedButSuccessful(
@@ -102,26 +267,31 @@ Resilience::assertDegradedButSuccessful(
 );
 ```
 
+Notes:
+
+- call `Log::spy()` before using `assertLogWritten()`
+- use Laravel fakes such as `Event::fake()` and `Bus::fake()` before event and job assertions
+
 ## Scenario runner
 
-The scenario runner lets you define named resilience exercises and run them from Artisan.
+Scenarios let you define a named resilience exercise and rerun it from Artisan.
 
-A scenario is useful when you want to:
+This is useful when you want to:
 
-- activate one or more fault rules
-- execute a real application workflow while those faults are active
+- activate one or more faults
+- execute a real application workflow
 - capture a structured result
-- rerun the same resilience experiment by name later
+- rerun the same drill later by name
 
-Define scenarios in `config/resilience.php`:
+Register scenarios in `config/resilience.php`:
 
 ```php
 'scenarios' => [
-    'search-fallback' => App\Resilience\SearchFallbackScenario::class,
+    'payment-fallback' => App\Resilience\PaymentFallbackScenario::class,
 ],
 ```
 
-Each scenario class should implement `MeShaon\LaravelResilience\Scenarios\ResilienceScenario`, return the fault rules it wants to activate, and provide a `run()` method.
+Each scenario class must implement `MeShaon\LaravelResilience\Scenarios\ResilienceScenario`.
 
 Example:
 
@@ -166,189 +336,130 @@ final class PaymentFallbackScenario implements ResilienceScenario
 }
 ```
 
-When you run this scenario, Laravel Resilience will:
-
-1. resolve the configured scenario by name
-2. verify that fault activation is allowed in the current environment
-3. activate the scenario's fault rules
-4. execute the scenario's `run()` method
-5. collect a result report and log entry
-6. clean up the active faults afterward
-
-Run a configured scenario with Artisan:
+Run it with:
 
 ```bash
-php artisan resilience:run search-fallback
+php artisan resilience:run payment-fallback
 ```
 
-That command is useful for repeatable resilience drills, local debugging, and shared team experiments. Instead of rebuilding fault setup manually, you can rerun the same named workflow whenever you need it.
-
-For structured output:
+Useful options:
 
 ```bash
-php artisan resilience:run search-fallback --json
+php artisan resilience:run payment-fallback --json
+php artisan resilience:run payment-fallback --dry-run
+RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS=true php artisan resilience:run payment-fallback --confirm-non-local
 ```
 
-The JSON output is helpful if you want to inspect the result programmatically or feed it into later automation and reporting.
+When a scenario runs, Laravel Resilience:
 
-### Non-local scenario safety
-
-Scenario execution is intentionally stricter outside `local` and `testing`.
-
-If you want to run a scenario in an environment like `staging`, the override ceremony is:
-
-1. enable non-local scenario runs with `RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS=true`
-2. run the command with `--confirm-non-local`
-
-Example:
-
-```bash
-RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS=true php artisan resilience:run search-fallback --confirm-non-local
-```
-
-If you want to inspect the scenario safely first, use:
-
-```bash
-php artisan resilience:run search-fallback --dry-run
-```
-
-Dry runs resolve the scenario, show which fault rules would be activated, and write an audit log entry, but they do not activate faults or execute the scenario body.
+1. resolves the configured scenario
+2. verifies the current environment is allowed
+3. activates the scenario's fault rules
+4. executes the scenario body
+5. returns a structured report
+6. logs the run and cleans up active faults
 
 ## Discovery scanner
 
-Laravel Resilience also includes a discovery command for finding resilience-relevant code patterns before you have written many tests.
+The discovery scanner helps you find code paths that are likely to need resilience attention.
 
-Use it when you want a quick review of code paths that are likely good candidates for:
-
-- resilience tests
-- fault injection coverage
-- abstraction behind contracts or services
-- follow-up architectural review
-
-Run the scanner with:
+Run it with:
 
 ```bash
 php artisan resilience:discover
-```
-
-You can also scan a specific path:
-
-```bash
 php artisan resilience:discover app/Services
-```
-
-Or request structured output:
-
-```bash
 php artisan resilience:discover --json
+php artisan resilience:discover --category=http --category=queue
 ```
 
-The scanner currently looks for practical patterns such as:
+Current finding categories:
 
-- outbound HTTP calls
-- mail send points
-- queue dispatches
-- storage writes
-- cache usage
-- direct construction of external-style clients
-- constructors coupled to concrete client or gateway classes
+- `http`
+- `mail`
+- `queue`
+- `storage`
+- `cache`
+- `client-construction`
+- `concrete-dependency`
 
-Example output:
+What it is good for:
 
-```text
-Laravel Resilience discovery findings
-Scanned path: /project/app
-Files scanned: 18
-Findings: 4
+- spotting outbound integration points
+- finding direct construction of clients and gateways
+- identifying areas that probably deserve resilience tests or architectural review
 
-http:
-- Outbound HTTP call through the Laravel HTTP client. [app/Services/BillingService.php:18]
-
-queue:
-- Queue or bus dispatch point. [app/Listeners/SendInvoiceListener.php:27]
-
-client-construction:
-- Direct construction of an external-style client. [app/Services/SearchService.php:14]
-```
-
-The scanner is intentionally heuristic-based. It does not try to prove that code is wrong. Instead, it highlights places that are often resilience-sensitive and worth reviewing.
-
-So the output should be read as:
-
-- "this code path probably deserves resilience attention"
-
-not:
-
-- "this code is definitely broken"
+The scanner is heuristic-based. It highlights likely resilience-sensitive code, not proven defects.
 
 ## Suggestion engine
 
-The suggestion engine builds on top of discovery findings and turns them into practical next steps.
-It does not just repeat "this area looks risky." It also tries to detect whether the code already has some resilience signals in place and then reports the gap.
+The suggestion engine builds on discovery findings and turns them into practical follow-up recommendations.
 
 Run it with:
 
 ```bash
 php artisan resilience:suggest
-```
-
-Or scan a specific path:
-
-```bash
 php artisan resilience:suggest app/Services
-```
-
-For structured output:
-
-```bash
 php artisan resilience:suggest --json
+php artisan resilience:suggest --category=cache
 ```
 
-Typical suggestions include:
-
-- wrap this external client behind a service boundary
-- introduce a contract for this concrete dependency
-- extract HTTP logic from a controller or listener
-- add a resilience scenario or fault-injection test for this flow
-- review duplicate side effects or degraded behavior for this queue or storage path
-
-Each suggestion includes:
+Suggestions include:
 
 - a severity level
 - an assessment of `missing`, `partial`, or `covered`
-- evidence the engine found in the same file or related tests
-- missing signals that may deserve follow-up
+- evidence already detected in the codebase
+- missing signals that may need more work
 
-Example output:
+This makes the command more helpful than a generic warning because it tries to show both what is already present and what still appears to be missing.
 
-```text
-http:
-- [high|missing] Wrap this outbound HTTP dependency behind a service boundary and add a resilience scenario or timeout/fallback test around it. [app/Http/Controllers/CheckoutController.php:18]
-  Missing: timeout handling not detected; local fallback or exception handling not detected; related tests or resilience scenarios not detected
+## Advanced fault rules
 
-- [high|covered] Existing safeguards were detected here. Review whether the current protections are enough before adding more resilience work. [app/Services/BillingService.php:22]
-  Evidence: timeout handling detected in the same file; retry handling detected in the same file; local fallback or exception handling detected; related tests or resilience scenarios detected
+If you need more control than the fluent builder provides, you can work directly with `FaultRule` and `FaultTarget`.
+
+Available rule factories include:
+
+- `FaultRule::exception(...)`
+- `FaultRule::timeout(...)`
+- `FaultRule::latency(...)`
+- `FaultRule::failFirst(...)`
+- `FaultRule::recoverAfter(...)`
+- `FaultRule::percentage(...)`
+- `FaultRule::percentageOnAttempts(...)`
+
+Example:
+
+```php
+use MeShaon\LaravelResilience\Facades\Resilience;
+use MeShaon\LaravelResilience\Faults\FaultRule;
+use MeShaon\LaravelResilience\Faults\FaultTarget;
+
+$target = FaultTarget::integration('payment-gateway');
+
+Resilience::activate(
+    FaultRule::failFirst('payment-fails-first-two-attempts', $target, 2)
+);
+
+Resilience::shouldActivate($target, 1); // true
+Resilience::shouldActivate($target, 2); // true
+Resilience::shouldActivate($target, 3); // false
 ```
 
-The detection is still heuristic-based. It does not prove that code is safe or unsafe, and it will not understand every custom resilience pattern in an application. Its job is to give developers more helpful review guidance than a generic recommendation by showing what seems to be present already and what still appears to be missing.
+This is especially useful for custom integrations or application-specific resilience logic that is not being proxied through the container helpers.
 
-## Installation
+Important:
 
-Install the package with Composer:
+- direct container and Laravel integration injection currently supports only `timeout`, `exception`, and `latency`
+- the richer rule model is still useful for custom targets and deterministic resilience logic in your own code
+
+## Command reference
 
 ```bash
-composer require me-shaon/laravel-resilience
+php artisan resilience:run {scenario} [--json] [--dry-run] [--confirm-non-local]
+php artisan resilience:discover {path?} [--json] [--category=*]
+php artisan resilience:suggest {path?} [--json] [--category=*]
 ```
 
-Laravel package discovery will register the service provider and facade automatically.
-
-If you want to customize the package safety defaults, publish the config file:
-
-```bash
-php artisan vendor:publish --tag="laravel-resilience-config"
-```
-
-## Testing
+## Development
 
 ```bash
 composer test
