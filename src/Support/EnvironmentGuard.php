@@ -50,6 +50,11 @@ final class EnvironmentGuard
         return $this->activationException() === null;
     }
 
+    public function allowsNonLocalScenarioRuns(): bool
+    {
+        return (bool) $this->config->get('resilience.scenario_runner.allow_non_local', false);
+    }
+
     public function currentEnvironment(): string
     {
         return (string) $this->app->environment();
@@ -66,6 +71,37 @@ final class EnvironmentGuard
 
         if ($exception !== null) {
             throw $exception;
+        }
+    }
+
+    public function ensureCanRunScenario(
+        string $subject,
+        bool $confirmedNonLocal = false,
+        bool $dryRun = false
+    ): void {
+        if ($dryRun) {
+            return;
+        }
+
+        $this->ensureCanActivate($subject);
+
+        if ($this->runsSafelyInCurrentEnvironment()) {
+            return;
+        }
+
+        if (! $this->allowsNonLocalScenarioRuns()) {
+            throw ActivationNotAllowed::becauseNonLocalExecutionRequiresConfig(
+                $subject,
+                $this->currentEnvironment(),
+                $this->safeScenarioEnvironments()
+            );
+        }
+
+        if (! $confirmedNonLocal) {
+            throw ActivationNotAllowed::becauseNonLocalExecutionRequiresConfirmation(
+                $subject,
+                $this->currentEnvironment()
+            );
         }
     }
 
@@ -90,5 +126,24 @@ final class EnvironmentGuard
             $this->currentEnvironment(),
             $blockedEnvironments
         );
+    }
+
+    private function runsSafelyInCurrentEnvironment(): bool
+    {
+        return in_array($this->currentEnvironment(), $this->safeScenarioEnvironments(), true);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function safeScenarioEnvironments(): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map(
+                static fn (mixed $environment): string => trim((string) $environment),
+                (array) $this->config->get('resilience.scenario_runner.safe_environments', ['local', 'testing'])
+            ),
+            static fn (string $environment): bool => $environment !== ''
+        )));
     }
 }

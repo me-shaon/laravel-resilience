@@ -22,6 +22,21 @@ return [
     ],
 
     /*
+     * Scenario runner safety rules.
+     *
+     * Scenario execution is considered safe by default in local-style environments.
+     * Any other environment requires explicit opt-in plus the `--confirm-non-local`
+     * command flag before the runner will activate faults.
+     *
+     * Use `--dry-run` to inspect a scenario without activating faults or executing
+     * the scenario body.
+     */
+    'scenario_runner' => [
+        'safe_environments' => ['local', 'testing'],
+        'allow_non_local' => (bool) env('RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS', false),
+    ],
+
+    /*
      * Default paths for resilience discovery scans. The discovery command
      * scans the application path by default, but these values document the
      * expected source locations for future expansion.

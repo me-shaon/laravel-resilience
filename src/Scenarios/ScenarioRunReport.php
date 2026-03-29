@@ -44,6 +44,11 @@ final class ScenarioRunReport implements JsonSerializable
         );
     }
 
+    public function dryRun(): bool
+    {
+        return $this->status === 'dry-run';
+    }
+
     public function environment(): string
     {
         return $this->environment;

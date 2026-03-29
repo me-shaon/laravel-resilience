@@ -29,4 +29,31 @@ final class ActivationNotAllowed extends RuntimeException
             $subject
         ));
     }
+
+    /**
+     * @param  array<int, string>  $safeEnvironments
+     */
+    public static function becauseNonLocalExecutionRequiresConfig(
+        string $subject,
+        string $currentEnvironment,
+        array $safeEnvironments
+    ): self {
+        return new self(sprintf(
+            '%s cannot run in the [%s] environment without enabling [resilience.scenario_runner.allow_non_local]. Safe environments: [%s].',
+            $subject,
+            $currentEnvironment,
+            implode(', ', $safeEnvironments)
+        ));
+    }
+
+    public static function becauseNonLocalExecutionRequiresConfirmation(
+        string $subject,
+        string $currentEnvironment
+    ): self {
+        return new self(sprintf(
+            '%s requires explicit confirmation for non-local execution in the [%s] environment. Re-run the command with [--confirm-non-local].',
+            $subject,
+            $currentEnvironment
+        ));
+    }
 }

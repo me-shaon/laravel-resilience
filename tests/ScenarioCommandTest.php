@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Artisan;
+use MeShaon\LaravelResilience\Facades\Resilience;
 use MeShaon\LaravelResilience\Tests\Fixtures\Payments\FakePaymentGateway;
 use MeShaon\LaravelResilience\Tests\Fixtures\Payments\PaymentGateway;
 use MeShaon\LaravelResilience\Tests\Fixtures\Scenarios\FailingSearchScenario;
@@ -68,4 +69,61 @@ it('shows a readable error when a blocked environment prevents running a scenari
 
     expect($exitCode)->toBe(1)
         ->and($output)->toContain('Unable to run scenario [payment-fallback]');
+});
+
+it('supports dry-run output without activating faults', function () {
+    $this->app['env'] = 'production';
+    config()->set('resilience.blocked_environments', ['production']);
+    config()->set('resilience.scenarios', [
+        'payment-fallback' => SuccessfulFallbackScenario::class,
+    ]);
+
+    app()->singleton(PaymentGateway::class, FakePaymentGateway::class);
+
+    $exitCode = Artisan::call('resilience:run', ['scenario' => 'payment-fallback', '--dry-run' => true]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('dry-run')
+        ->and($output)->toContain('No faults were activated')
+        ->and(Resilience::activeFaults())->toBe([]);
+});
+
+it('shows a readable error when non-local confirmation is missing', function () {
+    $this->app['env'] = 'staging';
+    config()->set('resilience.blocked_environments', []);
+    config()->set('resilience.scenario_runner.allow_non_local', true);
+    config()->set('resilience.scenarios', [
+        'payment-fallback' => SuccessfulFallbackScenario::class,
+    ]);
+
+    app()->singleton(PaymentGateway::class, FakePaymentGateway::class);
+
+    $exitCode = Artisan::call('resilience:run', ['scenario' => 'payment-fallback']);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(1)
+        ->and($output)->toContain('Unable to run scenario [payment-fallback]')
+        ->and($output)->toContain('--confirm-non-local');
+});
+
+it('runs non-local scenarios when explicit confirmation is provided', function () {
+    $this->app['env'] = 'staging';
+    config()->set('resilience.blocked_environments', []);
+    config()->set('resilience.scenario_runner.allow_non_local', true);
+    config()->set('resilience.scenarios', [
+        'payment-fallback' => SuccessfulFallbackScenario::class,
+    ]);
+
+    app()->singleton(PaymentGateway::class, FakePaymentGateway::class);
+
+    $exitCode = Artisan::call('resilience:run', [
+        'scenario' => 'payment-fallback',
+        '--confirm-non-local' => true,
+    ]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('Scenario [payment-fallback]')
+        ->and($output)->toContain('completed successfully');
 });

@@ -160,6 +160,14 @@ final class LaravelResilience
         $this->environmentGuard->ensureCanActivate($subject);
     }
 
+    public function ensureCanRunScenario(
+        string $subject,
+        bool $confirmedNonLocal = false,
+        bool $dryRun = false
+    ): void {
+        $this->environmentGuard->ensureCanRunScenario($subject, $confirmedNonLocal, $dryRun);
+    }
+
     public function currentEnvironment(): string
     {
         return $this->environmentGuard->currentEnvironment();

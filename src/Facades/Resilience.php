@@ -25,6 +25,7 @@ use MeShaon\LaravelResilience\LaravelResilience;
  * @method static bool enabled()
  * @method static bool canActivate()
  * @method static void ensureCanActivate(string $subject = 'Laravel Resilience')
+ * @method static void ensureCanRunScenario(string $subject, bool $confirmedNonLocal = false, bool $dryRun = false)
  * @method static string currentEnvironment()
  * @method static ContainerFaultBuilder filesystem(?string $disk = null)
  * @method static ContainerFaultBuilder for(string $abstract)

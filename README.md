@@ -16,6 +16,9 @@ The package is in active development. The baseline package bootstrapping, rule-b
 - `RESILIENCE_ENABLED=true` keeps the package available by default
 - `resilience.blocked_environments` defaults to `['production']`
 - removing `'production'` from `resilience.blocked_environments` explicitly allows production activation
+- scenario runs are only treated as safe by default in `local` and `testing`
+- running scenarios in any other environment requires enabling `RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS=true` and passing `--confirm-non-local`
+- `php artisan resilience:run ... --dry-run` previews a scenario without activating faults or executing the scenario body
 
 ## Planned capabilities
 
@@ -187,6 +190,29 @@ php artisan resilience:run search-fallback --json
 ```
 
 The JSON output is helpful if you want to inspect the result programmatically or feed it into later automation and reporting.
+
+### Non-local scenario safety
+
+Scenario execution is intentionally stricter outside `local` and `testing`.
+
+If you want to run a scenario in an environment like `staging`, the override ceremony is:
+
+1. enable non-local scenario runs with `RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS=true`
+2. run the command with `--confirm-non-local`
+
+Example:
+
+```bash
+RESILIENCE_ALLOW_NON_LOCAL_SCENARIOS=true php artisan resilience:run search-fallback --confirm-non-local
+```
+
+If you want to inspect the scenario safely first, use:
+
+```bash
+php artisan resilience:run search-fallback --dry-run
+```
+
+Dry runs resolve the scenario, show which fault rules would be activated, and write an audit log entry, but they do not activate faults or execute the scenario body.
 
 ## Discovery scanner
 

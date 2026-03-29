@@ -71,3 +71,76 @@ it('enforces environment restrictions when running scenarios', function () {
     expect(fn () => app(ScenarioRunner::class)->run('payment-fallback'))
         ->toThrow(ActivationNotAllowed::class, 'Scenario [payment-fallback]');
 });
+
+it('supports dry runs without activating faults or executing the scenario body', function () {
+    Log::spy();
+
+    $this->app['env'] = 'production';
+    config()->set('resilience.blocked_environments', ['production']);
+    config()->set('resilience.scenarios', [
+        'payment-fallback' => SuccessfulFallbackScenario::class,
+    ]);
+
+    app()->singleton(PaymentGateway::class, FakePaymentGateway::class);
+
+    $report = app(ScenarioRunner::class)->run('payment-fallback', dryRun: true);
+
+    expect($report->dryRun())->toBeTrue()
+        ->and($report->status())->toBe('dry-run')
+        ->and($report->activatedFaults())->toBe(['payment-timeout'])
+        ->and($report->result())->toBe([
+            'dry_run' => true,
+            'message' => 'Dry run only. No faults were activated and the scenario body was not executed.',
+        ])
+        ->and(Resilience::activeFaults())->toBe([]);
+
+    Log::shouldHaveReceived('info')->withArgs(
+        fn (string $message, array $context): bool => $message === 'resilience.scenario_ran'
+            && $context['name'] === 'payment-fallback'
+            && $context['status'] === 'dry-run'
+    );
+});
+
+it('requires explicit opt-in before running scenarios in non-local environments', function () {
+    $this->app['env'] = 'staging';
+    config()->set('resilience.blocked_environments', []);
+    config()->set('resilience.scenario_runner.allow_non_local', false);
+    config()->set('resilience.scenarios', [
+        'payment-fallback' => SuccessfulFallbackScenario::class,
+    ]);
+
+    app()->singleton(PaymentGateway::class, FakePaymentGateway::class);
+
+    expect(fn () => app(ScenarioRunner::class)->run('payment-fallback'))
+        ->toThrow(ActivationNotAllowed::class, 'resilience.scenario_runner.allow_non_local');
+});
+
+it('requires explicit confirmation before running non-local scenarios after opt-in', function () {
+    $this->app['env'] = 'staging';
+    config()->set('resilience.blocked_environments', []);
+    config()->set('resilience.scenario_runner.allow_non_local', true);
+    config()->set('resilience.scenarios', [
+        'payment-fallback' => SuccessfulFallbackScenario::class,
+    ]);
+
+    app()->singleton(PaymentGateway::class, FakePaymentGateway::class);
+
+    expect(fn () => app(ScenarioRunner::class)->run('payment-fallback'))
+        ->toThrow(ActivationNotAllowed::class, '--confirm-non-local');
+});
+
+it('runs non-local scenarios when opt-in and confirmation are both present', function () {
+    $this->app['env'] = 'staging';
+    config()->set('resilience.blocked_environments', []);
+    config()->set('resilience.scenario_runner.allow_non_local', true);
+    config()->set('resilience.scenarios', [
+        'payment-fallback' => SuccessfulFallbackScenario::class,
+    ]);
+
+    app()->singleton(PaymentGateway::class, FakePaymentGateway::class);
+
+    $report = app(ScenarioRunner::class)->run('payment-fallback', confirmedNonLocal: true);
+
+    expect($report->successful())->toBeTrue()
+        ->and($report->environment())->toBe('staging');
+});
