@@ -14,6 +14,27 @@ Use Laravel Resilience when you want to:
 
 In short: use mocks when you want fast unit-level feedback about your own code. Use Laravel Resilience when you want confidence that the real Laravel wiring and failure-handling path still behave correctly when a dependency breaks.
 
+## Compatibility
+
+- PHP 8.1+
+- Laravel 10, 11, 12, and 13
+
+## Installation
+
+Install the package with Composer:
+
+```bash
+composer require me-shaon/laravel-resilience
+```
+
+Laravel package discovery will register the service provider and facade automatically.
+
+If you want to customize the defaults, publish the config file:
+
+```bash
+php artisan vendor:publish --tag="laravel-resilience-config"
+```
+
 ## An easy way to start
 
 You do not need to begin by writing resilience tests from scratch.
@@ -164,27 +185,6 @@ Available today:
 Current limitation:
 
 - container and Laravel integration proxies currently support `timeout`, `exception`, and `latency` rules
-
-## Compatibility
-
-- PHP 8.1+
-- Laravel 10, 11, 12, and 13
-
-## Installation
-
-Install the package with Composer:
-
-```bash
-composer require me-shaon/laravel-resilience
-```
-
-Laravel package discovery will register the service provider and facade automatically.
-
-If you want to customize the defaults, publish the config file:
-
-```bash
-php artisan vendor:publish --tag="laravel-resilience-config"
-```
 
 ## Configuration and safety defaults
 
