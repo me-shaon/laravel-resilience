@@ -2,6 +2,41 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.5.1 - 2026-03-29
+
+### v0.5.1
+
+#### Summary
+
+- Patch release focused on package adoption: clearer README guidance, a discovery-first onboarding flow, leaner Composer exports, and package metadata updates that avoid Composer classifying the package as dev-only.
+
+#### Highlights
+
+- Rewrote and reorganized the README so users can understand the package value, installation, discovery flow, and resilience testing approach more quickly.
+- Added clearer top-level guidance explaining how Laravel Resilience differs from regular integration tests that rely on mocks.
+- Moved discovery and suggestion workflows earlier in the docs so users can start by scanning their app before writing manual fault-injection tests.
+- Excluded internal playbooks from Composer distribution archives.
+- Updated package metadata to remove the `testing` keyword and use a broader package description.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- composer format -- --test
+
+#### Full Changelog
+
+- ee4f389 Update package metadata to remove testing classification
+- b0bd9a5 Move README compatibility and installation earlier
+- 9354f99 Improve README onboarding with discovery-first guidance
+- 0e62075 Clarify README value proposition and resilience testing example
+- 0381f42 Exclude playbooks from Composer package exports
+- f3308aa Rewrite README as clearer package documentation
+- b9793f7 Update CHANGELOG
+- 74bc0eb Merge remote-tracking branch 'origin/main'
+- 8f183c8 Update CHANGELOG
+
 ## v0.5.0 - 2026-03-29
 
 ### v0.5.0
