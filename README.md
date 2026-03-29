@@ -255,6 +255,57 @@ not:
 
 - "this code is definitely broken"
 
+## Suggestion engine
+
+The suggestion engine builds on top of discovery findings and turns them into practical next steps.
+It does not just repeat "this area looks risky." It also tries to detect whether the code already has some resilience signals in place and then reports the gap.
+
+Run it with:
+
+```bash
+php artisan resilience:suggest
+```
+
+Or scan a specific path:
+
+```bash
+php artisan resilience:suggest app/Services
+```
+
+For structured output:
+
+```bash
+php artisan resilience:suggest --json
+```
+
+Typical suggestions include:
+
+- wrap this external client behind a service boundary
+- introduce a contract for this concrete dependency
+- extract HTTP logic from a controller or listener
+- add a resilience scenario or fault-injection test for this flow
+- review duplicate side effects or degraded behavior for this queue or storage path
+
+Each suggestion includes:
+
+- a severity level
+- an assessment of `missing`, `partial`, or `covered`
+- evidence the engine found in the same file or related tests
+- missing signals that may deserve follow-up
+
+Example output:
+
+```text
+http:
+- [high|missing] Wrap this outbound HTTP dependency behind a service boundary and add a resilience scenario or timeout/fallback test around it. [app/Http/Controllers/CheckoutController.php:18]
+  Missing: timeout handling not detected; local fallback or exception handling not detected; related tests or resilience scenarios not detected
+
+- [high|covered] Existing safeguards were detected here. Review whether the current protections are enough before adding more resilience work. [app/Services/BillingService.php:22]
+  Evidence: timeout handling detected in the same file; retry handling detected in the same file; local fallback or exception handling detected; related tests or resilience scenarios detected
+```
+
+The detection is still heuristic-based. It does not prove that code is safe or unsafe, and it will not understand every custom resilience pattern in an application. Its job is to give developers more helpful review guidance than a generic recommendation by showing what seems to be present already and what still appears to be missing.
+
 ## Installation
 
 Install the package with Composer:

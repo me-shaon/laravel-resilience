@@ -144,7 +144,9 @@ final class DiscoveryScanner
 
     private function relativePath(string $absolutePath): string
     {
-        return ltrim(str_replace($this->projectRoot, '', $absolutePath), DIRECTORY_SEPARATOR);
+        $relativePath = ltrim(str_replace($this->projectRoot, '', $absolutePath), DIRECTORY_SEPARATOR);
+
+        return str_replace('\\', '/', $relativePath);
     }
 
     private function resolveBasePath(string $basePath): string

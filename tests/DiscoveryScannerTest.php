@@ -10,7 +10,7 @@ it('identifies resilience-relevant patterns in fixture code', function () {
         $report->findings()
     );
 
-    expect($report->filesScanned())->toBe(2)
+    expect($report->filesScanned())->toBe(4)
         ->and($categories)->toContain('http')
         ->and($categories)->toContain('mail')
         ->and($categories)->toContain('queue')
@@ -23,8 +23,9 @@ it('identifies resilience-relevant patterns in fixture code', function () {
 it('can filter findings by category', function () {
     $report = app(DiscoveryScanner::class)->scan('tests/Fixtures/Discovery', ['http']);
 
-    expect($report->findings())->toHaveCount(1)
-        ->and($report->findings()[0]->category())->toBe('http');
+    expect($report->findings())->toHaveCount(2)
+        ->and($report->findings()[0]->category())->toBe('http')
+        ->and($report->findings()[1]->category())->toBe('http');
 });
 
 it('ignores unrelated files reasonably well', function () {

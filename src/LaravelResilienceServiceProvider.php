@@ -4,10 +4,12 @@ namespace MeShaon\LaravelResilience;
 
 use MeShaon\LaravelResilience\Commands\DiscoverResilienceRisksCommand;
 use MeShaon\LaravelResilience\Commands\RunResilienceScenarioCommand;
+use MeShaon\LaravelResilience\Commands\SuggestResilienceImprovementsCommand;
 use MeShaon\LaravelResilience\Discovery\DiscoveryScanner;
 use MeShaon\LaravelResilience\Faults\FaultManager;
 use MeShaon\LaravelResilience\Faults\Injectors\ContainerFaultInjector;
 use MeShaon\LaravelResilience\Scenarios\ScenarioRunner;
+use MeShaon\LaravelResilience\Suggestions\SuggestionEngine;
 use MeShaon\LaravelResilience\Support\EnvironmentGuard;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
@@ -20,7 +22,8 @@ class LaravelResilienceServiceProvider extends PackageServiceProvider
             ->name('laravel-resilience')
             ->hasConfigFile()
             ->hasCommand(DiscoverResilienceRisksCommand::class)
-            ->hasCommand(RunResilienceScenarioCommand::class);
+            ->hasCommand(RunResilienceScenarioCommand::class)
+            ->hasCommand(SuggestResilienceImprovementsCommand::class);
     }
 
     public function packageRegistered(): void
@@ -30,6 +33,7 @@ class LaravelResilienceServiceProvider extends PackageServiceProvider
         $this->app->singleton(FaultManager::class);
         $this->app->singleton(ContainerFaultInjector::class);
         $this->app->singleton(ScenarioRunner::class);
+        $this->app->singleton(SuggestionEngine::class);
 
         $this->app->singleton(
             'resilience',
