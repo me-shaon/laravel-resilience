@@ -1,11 +1,11 @@
 {
     "name": "me-shaon/laravel-resilience",
-    "description": "Laravel-native resilience testing and fault injection toolkit.",
+    "description": "Laravel-native fault injection and resilience verification toolkit.",
     "keywords": [
         "laravel",
         "resilience",
         "fault-injection",
-        "testing"
+        "reliability"
     ],
     "homepage": "https://github.com/me-shaon/laravel-resilience",
     "license": "MIT",
