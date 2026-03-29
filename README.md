@@ -14,6 +14,63 @@ Use Laravel Resilience when you want to:
 
 In short: use mocks when you want fast unit-level feedback about your own code. Use Laravel Resilience when you want confidence that the real Laravel wiring and failure-handling path still behave correctly when a dependency breaks.
 
+## An easy way to start
+
+You do not need to begin by writing resilience tests from scratch.
+
+The easiest onboarding path is:
+
+1. run the discovery command to find resilience-sensitive parts of your app
+2. run the suggestion command to see where resilience coverage is missing
+3. add focused fault-injection tests only for the flows that matter most
+
+Start with:
+
+```bash
+php artisan resilience:discover
+php artisan resilience:suggest
+```
+
+What these commands help you see:
+
+- `resilience:discover` shows code paths that look resilience-sensitive, such as HTTP calls, queue dispatches, cache usage, storage writes, or direct construction of external clients
+- `resilience:suggest` turns those findings into practical next steps, such as adding a fallback test, extracting a dependency behind a service boundary, or reviewing duplicate-side-effect protection
+
+Example:
+
+```text
+$ php artisan resilience:discover
+
+Laravel Resilience discovery findings
+Scanned path: /project/app
+Files scanned: 18
+Findings: 4
+
+http:
+- Outbound HTTP call through the Laravel HTTP client. [app/Services/BillingService.php:18]
+
+queue:
+- Queue or bus dispatch point. [app/Listeners/SendInvoiceListener.php:27]
+
+$ php artisan resilience:suggest
+
+Laravel Resilience suggestions
+Scanned path: /project/app
+Suggestions: 2
+
+http:
+- [high|missing] Wrap this outbound HTTP dependency behind a service boundary and add a resilience scenario or timeout/fallback test around it. [app/Services/BillingService.php:18]
+  Missing: timeout handling not detected; local fallback or exception handling not detected; related tests or resilience scenarios not detected
+```
+
+This makes the package easier to adopt because it can first help you answer:
+
+- which parts of my app are most likely to fail in real life?
+- where should I add resilience tests first?
+- which flows already look partially protected?
+
+Then, once you know where the risky paths are, you can write targeted resilience tests for those flows.
+
 ## A quick example
 
 The clearest way to understand the package is to see both:
@@ -171,38 +228,25 @@ use MeShaon\LaravelResilience\Facades\Resilience;
 $status = Resilience::activationStatus();
 ```
 
-## Quick start
+## Manual fault injection
 
-The most common workflow is:
+Once you know which flow you want to verify, the usual workflow is:
 
-1. activate a fault for a dependency
-2. run the code path you want to exercise
-3. assert that the application handled the failure well
+1. activate a fault for a real dependency
+2. run the normal application code
+3. assert that the fallback or degraded behavior happened
 4. clean up the active fault
 
-Example:
+Minimal example:
 
 ```php
 use App\Contracts\PaymentGateway;
-use Illuminate\Support\Facades\Log;
 use MeShaon\LaravelResilience\Facades\Resilience;
-
-Log::spy();
 
 Resilience::for(PaymentGateway::class)->timeout();
 
-$result = rescue(
-    fn () => app(PaymentGateway::class)->charge(500),
-    function (): string {
-        Log::warning('Payment gateway timeout.');
-
-        return 'queued-for-retry';
-    },
-    report: false,
-);
-
-Resilience::assertFallbackUsed($result, 'queued-for-retry', 'payment fallback');
-Resilience::assertLogWritten('warning', fn (mixed $message): bool => $message === 'Payment gateway timeout.');
+expect(fn () => app(PaymentGateway::class)->charge(500))
+    ->toThrow(RuntimeException::class, 'Operation timed out.');
 
 Resilience::deactivateAll();
 ```
