@@ -2,6 +2,32 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.5.0 - 2026-03-29
+
+### v0.5.0
+
+#### Summary
+
+- Adds explicit scenario safety guardrails for non-local environments, including dry-run support and a reviewable override ceremony for real fault activation.
+
+#### Highlights
+
+- Added non-local scenario protection so environments outside `local` and `testing` require explicit opt-in and `--confirm-non-local` before a scenario can run.
+- Added `--dry-run` support to inspect configured scenarios without activating faults or executing the scenario body.
+- Added clearer guardrail errors and audit coverage for dry-run and non-local scenario execution paths.
+- Documented the scenario safety model in the README and expanded command and runner coverage around non-local execution.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- composer format -- --test
+
+#### Full Changelog
+
+- 3d1966b Add scenario safety guardrails
+
 ## v0.4.0 - 2026-03-29
 
 ### v0.4.0
