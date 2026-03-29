@@ -2,6 +2,32 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.4.0 - 2026-03-29
+
+### v0.4.0
+
+#### Summary
+
+- Adds an evidence-aware suggestion engine on top of discovery findings so developers can see which resilience safeguards appear to be missing, partially present, or already covered.
+
+#### Highlights
+
+- Added the new `resilience:suggest` command with grouped and JSON output for actionable resilience guidance.
+- Added evidence-aware assessments with `missing`, `partial`, and `covered` states plus detected safeguards and missing signals.
+- Added guarded discovery fixtures and expanded tests to validate both generic and already-protected code paths.
+- Normalized discovery relative paths so command output stays consistent across Unix and Windows CI environments.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- composer format -- --test
+
+#### Full Changelog
+
+- 90c6f37 Add resilience suggestion engine
+
 ## v0.3.0 - 2026-03-28
 
 ### v0.3.0
