@@ -1,16 +1,96 @@
 # Laravel Resilience
 
-Laravel Resilience is a Laravel package for simulating failures in the parts of your application you depend on, such as HTTP APIs, mail, queues, cache, storage, and container-managed services. It helps you verify fallbacks, degraded responses, retries, and duplicate-side-effect protections before real outages or slowdowns affect production.
+Laravel Resilience helps you test how your Laravel application behaves when a real dependency becomes slow, times out, or goes down. Instead of replacing that dependency with a mock, it injects faults into the actual container-managed service or Laravel integration your code normally uses, so you can verify fallbacks, degraded responses, retries, logs, jobs, and duplicate-side-effect protection in a more realistic way.
 
 ## Why use this package?
 
 Use Laravel Resilience when you want to:
 
-- force a timeout, exception, or slowdown in a dependency
-- test how your application behaves when a service is unavailable
-- make resilience tests easier to read with dedicated assertions
-- run repeatable resilience drills through Artisan commands
-- scan your codebase for resilience-sensitive areas and get follow-up suggestions
+- test what really happens when a dependency fails, not just whether a mock was called
+- run your normal application flow while a real timeout, exception, or slowdown is injected
+- verify your fallback behavior, degraded responses, logs, events, jobs, and retry paths
+- repeat the same resilience exercise later through named scenarios and Artisan commands
+- scan your codebase for places that probably deserve resilience coverage
+
+In short: use mocks when you want fast unit-level feedback about your own code. Use Laravel Resilience when you want confidence that the real Laravel wiring and failure-handling path still behave correctly when a dependency breaks.
+
+## A quick example
+
+The clearest way to understand the package is to see both:
+
+- the real application code
+- the resilience test that injects the failure
+
+Imagine your checkout flow uses a payment gateway. If the gateway times out, your application should log the problem and mark the payment for retry instead of crashing.
+
+Application code:
+
+```php
+use App\Contracts\PaymentGateway;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
+
+final class CheckoutService
+{
+    public function __construct(
+        private PaymentGateway $paymentService
+    ) {}
+
+    public function charge(int $amount): array
+    {
+        try {
+            $this->paymentService->charge($amount);
+
+            return ['status' => 'paid'];
+        } catch (RuntimeException $exception) {
+            Log::warning('Payment gateway timeout.', [
+                'amount' => $amount,
+            ]);
+
+            return ['status' => 'retry'];
+        }
+    }
+}
+```
+
+Resilience test:
+
+```php
+use App\Contracts\PaymentGateway;
+use Illuminate\Support\Facades\Log;
+use MeShaon\LaravelResilience\Facades\Resilience;
+
+Log::spy();
+
+Resilience::for(PaymentGateway::class)->timeout();
+
+$result = app(CheckoutService::class)->charge(500);
+
+// Assert that the application switched to the retry fallback path.
+Resilience::assertFallbackUsed(
+    $result['status'],
+    'retry',
+    'payment status after gateway timeout'
+);
+Resilience::assertLogWritten('warning', 'Payment gateway timeout.');
+
+Resilience::deactivateAll();
+```
+
+What this test proves:
+
+- the real `CheckoutService` code runs
+- the real container dependency is the one being faulted
+- your fallback path is exercised under an injected failure
+- you can assert the user-visible or system-visible outcome
+
+Typical workflow:
+
+1. choose the real dependency you want to test
+2. inject the failure you want to simulate
+3. run the normal application flow
+4. assert that the fallback or degraded behavior happened
+5. clean up the active fault
 
 ## Status
 
