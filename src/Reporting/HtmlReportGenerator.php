@@ -137,17 +137,24 @@ final class HtmlReportGenerator
     private function renderDiscoveryCard(DiscoveryFinding $finding, ConsoleOutputMode $mode): string
     {
         $parts = [
-            '<article class="report-card" data-entry data-category="'.$this->escape($finding->category()).'" data-location="'.$this->escape($this->location($finding->relativePath(), $finding->line())).'" data-summary="'.$this->escape($finding->summary()).'" data-excerpt="'.$this->escape($finding->excerpt()).'" data-search="'.$this->escape($this->searchIndex([
+            '<article class="report-card report-card-discovery" data-entry data-category="'.$this->escape($finding->category()).'" data-location="'.$this->escape($this->location($finding->relativePath(), $finding->line())).'" data-summary="'.$this->escape($finding->summary()).'" data-excerpt="'.$this->escape($finding->excerpt()).'" data-search="'.$this->escape($this->searchIndex([
                 $finding->category(),
                 $finding->summary(),
                 $finding->relativePath(),
                 $finding->excerpt(),
             ])).'">',
-            '<div class="card-meta">',
+            '<div class="card-shell">',
+            '<div class="card-main">',
+            '<div class="card-meta card-meta-compact">',
             '<span class="badge badge-neutral">'.$this->escape($finding->category()).'</span>',
-            '<span class="location">'.$this->escape($this->location($finding->relativePath(), $finding->line())).'</span>',
+            '<span class="card-kicker">Finding</span>',
             '</div>',
-            '<h3>'.$this->escape($finding->summary()).'</h3>',
+            '<h3 class="card-title card-title-compact">'.$this->escape($finding->summary()).'</h3>',
+            '</div>',
+            '<div class="card-side">',
+            '<span class="location location-pill">'.$this->escape($this->location($finding->relativePath(), $finding->line())).'</span>',
+            '</div>',
+            '</div>',
         ];
 
         if ($mode === ConsoleOutputMode::Verbose) {
@@ -166,7 +173,7 @@ final class HtmlReportGenerator
     {
         $finding = $suggestion->finding();
         $parts = [
-            '<article class="report-card" data-entry data-category="'.$this->escape($suggestion->category()).'" data-location="'.$this->escape($this->location($finding->relativePath(), $finding->line())).'" data-severity="'.$this->escape($suggestion->severity()).'" data-assessment="'.$this->escape($suggestion->assessment()).'" data-recommendation="'.$this->escape($suggestion->recommendation()).'" data-evidence="'.$this->escape(implode(' || ', $suggestion->evidence())).'" data-missing="'.$this->escape(implode(' || ', $suggestion->missingSignals())).'" data-excerpt="'.$this->escape($finding->excerpt()).'" data-search="'.$this->escape($this->searchIndex([
+            '<article class="report-card report-card-suggestion" data-entry data-category="'.$this->escape($suggestion->category()).'" data-location="'.$this->escape($this->location($finding->relativePath(), $finding->line())).'" data-severity="'.$this->escape($suggestion->severity()).'" data-assessment="'.$this->escape($suggestion->assessment()).'" data-recommendation="'.$this->escape($suggestion->recommendation()).'" data-evidence="'.$this->escape(implode(' || ', $suggestion->evidence())).'" data-missing="'.$this->escape(implode(' || ', $suggestion->missingSignals())).'" data-excerpt="'.$this->escape($finding->excerpt()).'" data-search="'.$this->escape($this->searchIndex([
                 $suggestion->category(),
                 $suggestion->severity(),
                 $suggestion->assessment(),
@@ -176,12 +183,19 @@ final class HtmlReportGenerator
                 $finding->relativePath(),
                 $finding->excerpt(),
             ])).'">',
+            '<div class="card-shell">',
+            '<div class="card-main">',
             '<div class="card-meta">',
             '<span class="badge badge-'.$this->escape($suggestion->severity()).'">'.$this->escape($suggestion->severity()).'</span>',
             '<span class="badge badge-outline">'.$this->escape($suggestion->assessment()).'</span>',
-            '<span class="location">'.$this->escape($this->location($finding->relativePath(), $finding->line())).'</span>',
+            '<span class="badge badge-subtle">'.$this->escape($suggestion->category()).'</span>',
             '</div>',
-            '<h3>'.$this->escape($suggestion->recommendation()).'</h3>',
+            '<h3 class="card-title">'.$this->escape($suggestion->recommendation()).'</h3>',
+            '</div>',
+            '<div class="card-side">',
+            '<span class="location location-pill">'.$this->escape($this->location($finding->relativePath(), $finding->line())).'</span>',
+            '</div>',
+            '</div>',
         ];
 
         if ($mode !== ConsoleOutputMode::Compact && $suggestion->evidence() !== []) {
@@ -296,20 +310,24 @@ final class HtmlReportGenerator
     <style>
         :root {
             color-scheme: light;
-            --bg: #f4f7fb;
-            --panel: rgba(255, 255, 255, 0.82);
+            --bg: #eef4fb;
+            --panel: rgba(255, 255, 255, 0.92);
             --panel-strong: #ffffff;
             --text: #132238;
-            --muted: #5f6f86;
-            --border: rgba(19, 34, 56, 0.12);
+            --text-soft: #223554;
+            --muted: #61748f;
+            --border: rgba(19, 34, 56, 0.1);
             --accent: #0f766e;
-            --accent-soft: rgba(15, 118, 110, 0.12);
+            --accent-2: #2563eb;
+            --accent-soft: rgba(15, 118, 110, 0.1);
             --danger: #b42318;
-            --danger-soft: rgba(180, 35, 24, 0.12);
+            --danger-soft: rgba(180, 35, 24, 0.1);
             --warning: #b54708;
-            --warning-soft: rgba(181, 71, 8, 0.12);
-            --shadow: 0 20px 45px rgba(16, 36, 64, 0.12);
-            --radius: 20px;
+            --warning-soft: rgba(181, 71, 8, 0.1);
+            --shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+            --shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.06);
+            --radius: 22px;
+            --radius-sm: 16px;
         }
 
         * {
@@ -321,14 +339,14 @@ final class HtmlReportGenerator
             font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
             color: var(--text);
             background:
-                radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 35%),
-                radial-gradient(circle at top right, rgba(25, 118, 210, 0.12), transparent 25%),
-                linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
+                radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.18), transparent 28%),
+                radial-gradient(circle at 100% 0%, rgba(15, 118, 110, 0.18), transparent 32%),
+                linear-gradient(180deg, #f7fbff 0%, var(--bg) 45%, #f4f7fb 100%);
         }
 
         .page {
-            width: min(1200px, calc(100% - 32px));
-            margin: 32px auto 64px;
+            width: min(1240px, calc(100% - 32px));
+            margin: 28px auto 64px;
         }
 
         .hero,
@@ -341,8 +359,25 @@ final class HtmlReportGenerator
         }
 
         .hero {
-            padding: 32px;
+            position: relative;
+            overflow: hidden;
+            padding: 34px;
             margin-bottom: 24px;
+            background:
+                radial-gradient(circle at top right, rgba(148, 163, 184, 0.14), transparent 24%),
+                linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(15, 118, 110, 0.92) 58%, rgba(37, 99, 235, 0.88));
+            color: #f8fbff;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -80px -110px auto;
+            width: 280px;
+            height: 280px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            filter: blur(2px);
         }
 
         .eyebrow {
@@ -351,8 +386,10 @@ final class HtmlReportGenerator
             gap: 8px;
             padding: 8px 14px;
             border-radius: 999px;
-            background: var(--accent-soft);
-            color: var(--accent);
+            position: relative;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.14);
+            color: #f8fbff;
             font-size: 13px;
             font-weight: 600;
             letter-spacing: 0.02em;
@@ -369,14 +406,18 @@ final class HtmlReportGenerator
         }
 
         h1 {
+            position: relative;
+            z-index: 1;
             margin-top: 16px;
             font-size: clamp(32px, 4vw, 52px);
         }
 
         .subtitle {
+            position: relative;
+            z-index: 1;
             max-width: 760px;
             margin-top: 12px;
-            color: var(--muted);
+            color: rgba(248, 251, 255, 0.78);
             font-size: 16px;
             line-height: 1.6;
         }
@@ -386,19 +427,22 @@ final class HtmlReportGenerator
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 16px;
             margin-top: 28px;
+            position: relative;
+            z-index: 1;
         }
 
         .stat-card {
-            padding: 18px 20px;
+            padding: 18px 20px 16px;
             border-radius: 18px;
-            background: var(--panel-strong);
-            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            backdrop-filter: blur(10px);
         }
 
         .stat-label {
             display: block;
-            color: var(--muted);
-            font-size: 13px;
+            color: rgba(248, 251, 255, 0.68);
+            font-size: 12px;
             margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.04em;
@@ -406,14 +450,15 @@ final class HtmlReportGenerator
 
         .stat-value {
             display: block;
-            font-size: 18px;
+            color: #ffffff;
+            font-size: 17px;
             line-height: 1.45;
             word-break: break-word;
         }
 
         .panel {
             padding: 24px;
-            margin-bottom: 24px;
+            margin-bottom: 18px;
         }
 
         .panel-header {
@@ -429,17 +474,34 @@ final class HtmlReportGenerator
             color: var(--muted);
         }
 
+        .summary-panel {
+            overflow: hidden;
+        }
+
+        .results-panel {
+            position: relative;
+        }
+
         .toolbar {
             display: flex;
             flex-wrap: wrap;
             gap: 12px;
             margin-bottom: 18px;
+            position: sticky;
+            top: 14px;
+            z-index: 2;
+            padding: 14px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(19, 34, 56, 0.08);
+            backdrop-filter: blur(14px);
+            box-shadow: var(--shadow-soft);
         }
 
         .toolbar input {
             flex: 1 1 280px;
             min-width: 0;
-            padding: 14px 16px;
+            padding: 13px 15px;
             border-radius: 14px;
             border: 1px solid var(--border);
             background: var(--panel-strong);
@@ -458,12 +520,12 @@ final class HtmlReportGenerator
             background: linear-gradient(135deg, #0f766e, #0b5ed7);
             color: #ffffff;
             border-radius: 14px;
-            padding: 12px 16px;
+            padding: 11px 15px;
             font: inherit;
             font-weight: 600;
             cursor: pointer;
             transition: transform 0.18s ease, box-shadow 0.18s ease;
-            box-shadow: 0 12px 24px rgba(15, 118, 110, 0.18);
+            box-shadow: 0 10px 20px rgba(15, 118, 110, 0.14);
         }
 
         .toolbar-button:hover {
@@ -488,6 +550,7 @@ final class HtmlReportGenerator
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
+            margin-bottom: 16px;
         }
 
         .filter-chip {
@@ -511,25 +574,30 @@ final class HtmlReportGenerator
         table {
             width: 100%;
             border-collapse: collapse;
+            overflow: hidden;
         }
 
         th,
         td {
             text-align: left;
-            padding: 14px 12px;
+            padding: 13px 12px;
             border-bottom: 1px solid var(--border);
             vertical-align: top;
         }
 
         th {
             color: var(--muted);
-            font-size: 13px;
+            font-size: 12px;
             letter-spacing: 0.04em;
             text-transform: uppercase;
         }
 
+        tbody tr:nth-child(even) {
+            background: rgba(97, 116, 143, 0.03);
+        }
+
         .section-block + .section-block {
-            margin-top: 20px;
+            margin-top: 18px;
         }
 
         .section-header {
@@ -537,47 +605,96 @@ final class HtmlReportGenerator
             justify-content: space-between;
             align-items: center;
             gap: 16px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .section-count {
             color: var(--muted);
             font-size: 14px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(97, 116, 143, 0.08);
         }
 
         .card-grid {
             display: grid;
-            gap: 16px;
+            gap: 10px;
         }
 
         .report-card {
-            padding: 20px;
+            padding: 16px 18px;
             border-radius: 18px;
             background: var(--panel-strong);
             border: 1px solid var(--border);
+            box-shadow: var(--shadow-soft);
+            transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .report-card:hover {
+            border-color: rgba(37, 99, 235, 0.18);
+            transform: translateY(-1px);
+            box-shadow: 0 16px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        .report-card-discovery {
+            padding: 12px 14px;
+            border-radius: 16px;
+        }
+
+        .card-shell {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: start;
+        }
+
+        .card-main {
+            min-width: 0;
+        }
+
+        .card-side {
+            display: flex;
+            align-items: flex-start;
         }
 
         .card-meta {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
             align-items: center;
-            margin-bottom: 14px;
+            margin-bottom: 10px;
+        }
+
+        .card-meta-compact {
+            margin-bottom: 8px;
+        }
+
+        .card-kicker {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
         }
 
         .badge,
         .token {
             display: inline-flex;
             align-items: center;
-            padding: 8px 12px;
+            padding: 7px 11px;
             border-radius: 999px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             line-height: 1;
         }
 
         .badge-neutral {
-            background: rgba(19, 34, 56, 0.08);
+            background: rgba(37, 99, 235, 0.08);
+            color: #1d4ed8;
+        }
+
+        .badge-subtle {
+            background: rgba(19, 34, 56, 0.06);
             color: var(--text);
         }
 
@@ -604,31 +721,51 @@ final class HtmlReportGenerator
 
         .location {
             color: var(--muted);
-            font-size: 14px;
+            font-size: 13px;
             word-break: break-word;
         }
 
-        .report-card h3 {
-            font-size: 20px;
+        .location-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(97, 116, 143, 0.08);
+            border: 1px solid rgba(97, 116, 143, 0.12);
+            white-space: nowrap;
+        }
+
+        .card-title {
+            font-size: 17px;
             line-height: 1.45;
+            color: var(--text-soft);
+        }
+
+        .card-title-compact {
+            font-size: 14px;
+            line-height: 1.45;
+            font-weight: 700;
+            color: var(--text);
         }
 
         .detail-block {
-            margin-top: 18px;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(97, 116, 143, 0.12);
         }
 
         .detail-block h4 {
-            margin-bottom: 10px;
-            font-size: 14px;
+            margin-bottom: 8px;
+            font-size: 11px;
             color: var(--muted);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
         }
 
         .token-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
         }
 
         .token-positive {
@@ -643,12 +780,12 @@ final class HtmlReportGenerator
 
         pre {
             margin: 0;
-            padding: 16px;
+            padding: 14px 15px;
             border-radius: 16px;
             background: #0f172a;
             color: #dbeafe;
             font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-            font-size: 13px;
+            font-size: 12px;
             line-height: 1.6;
             white-space: pre-wrap;
             word-break: break-word;
@@ -670,9 +807,26 @@ final class HtmlReportGenerator
                 padding: 18px;
             }
 
+            .toolbar {
+                position: static;
+                padding: 12px;
+            }
+
             th,
             td {
                 padding-inline: 8px;
+            }
+
+            .card-shell {
+                grid-template-columns: 1fr;
+            }
+
+            .card-side {
+                justify-content: flex-start;
+            }
+
+            .location-pill {
+                white-space: normal;
             }
         }
     </style>
@@ -686,7 +840,7 @@ final class HtmlReportGenerator
             <div class="stats-grid">'.$statCards.'</div>
         </section>
 
-        <section class="panel">
+        <section class="panel summary-panel">
             <div class="panel-header">
                 <div>
                     <h2>'.$this->escape($summaryTitle).'</h2>
@@ -701,7 +855,7 @@ final class HtmlReportGenerator
             </table>
         </section>
 
-        <section class="panel">
+        <section class="panel results-panel">
             <div class="panel-header">
                 <div>
                     <h2>'.$this->escape($sectionsTitle).'</h2>
