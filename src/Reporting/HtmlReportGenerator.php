@@ -47,7 +47,11 @@ final class HtmlReportGenerator
     {
         $groupedFindings = $report->groupedFindings();
         $summaryRows = array_map(
-            static fn (string $category, array $findings): array => [$category, (string) count($findings)],
+            static fn (string $category, array $findings): array => [
+                $category,
+                $findings[0]->summary(),
+                (string) count($findings),
+            ],
             array_keys($groupedFindings),
             $groupedFindings
         );
@@ -55,17 +59,7 @@ final class HtmlReportGenerator
         $sections = [];
 
         foreach ($groupedFindings as $category => $findings) {
-            $cards = array_map(
-                fn (DiscoveryFinding $finding): string => $this->renderDiscoveryCard($finding, $mode),
-                $findings
-            );
-
-            $sections[] = $this->renderSection(
-                $category,
-                count($findings),
-                implode("\n", $cards),
-                $category
-            );
+            $sections[] = $this->renderDiscoverySection($category, $findings, $mode);
         }
 
         return $this->renderPage(
@@ -79,7 +73,7 @@ final class HtmlReportGenerator
                 ['label' => 'Mode', 'value' => ucfirst($mode->value)],
             ],
             summaryTitle: 'Category summary',
-            summaryHeaders: ['Category', 'Findings'],
+            summaryHeaders: ['Category', 'Summary', 'Findings'],
             summaryRows: $summaryRows,
             sectionsTitle: 'Findings by category',
             sectionsHtml: implode("\n", $sections)
@@ -145,14 +139,11 @@ final class HtmlReportGenerator
             ])).'">',
             '<div class="card-shell">',
             '<div class="card-main">',
-            '<div class="card-meta card-meta-compact">',
-            '<span class="badge badge-neutral">'.$this->escape($finding->category()).'</span>',
-            '<span class="card-kicker">Finding</span>',
-            '</div>',
-            '<h3 class="card-title card-title-compact">'.$this->escape($finding->summary()).'</h3>',
+            '<h3 class="card-title card-title-discovery">'.$this->escape($this->discoveryFileLabel($finding->relativePath())).'</h3>',
+            '<p class="card-subtitle">'.$this->escape($this->discoveryPathDirectory($finding->relativePath())).'</p>',
             '</div>',
             '<div class="card-side">',
-            '<span class="location location-pill">'.$this->escape($this->location($finding->relativePath(), $finding->line())).'</span>',
+            '<span class="location location-pill">Line '.$finding->line().'</span>',
             '</div>',
             '</div>',
         ];
@@ -167,6 +158,32 @@ final class HtmlReportGenerator
         $parts[] = '</article>';
 
         return implode("\n", $parts);
+    }
+
+    /**
+     * @param  array<int, DiscoveryFinding>  $findings
+     */
+    private function renderDiscoverySection(string $category, array $findings, ConsoleOutputMode $mode): string
+    {
+        $rows = array_map(
+            fn (DiscoveryFinding $finding): string => $this->renderDiscoveryCard($finding, $mode),
+            $findings
+        );
+
+        return implode("\n", [
+            '<section class="section-block" data-section data-category="'.$this->escape($category).'">',
+            '<div class="section-header">',
+            '<div>',
+            '<h2>'.$this->escape($category).'</h2>',
+            '<p class="section-description">'.$this->escape($findings[0]->summary()).'</p>',
+            '</div>',
+            '<span class="section-count">'.count($findings).' item'.(count($findings) === 1 ? '' : 's').'</span>',
+            '</div>',
+            '<div class="card-grid card-grid-discovery">',
+            implode("\n", $rows),
+            '</div>',
+            '</section>',
+        ]);
     }
 
     private function renderSuggestionCard(ResilienceSuggestion $suggestion, ConsoleOutputMode $mode): string
@@ -249,6 +266,20 @@ final class HtmlReportGenerator
             '</div>',
             '</section>',
         ]);
+    }
+
+    private function discoveryFileLabel(string $relativePath): string
+    {
+        $segments = explode('/', $relativePath);
+
+        return (string) end($segments);
+    }
+
+    private function discoveryPathDirectory(string $relativePath): string
+    {
+        $directory = dirname($relativePath);
+
+        return $directory === '.' ? $relativePath : $directory;
     }
 
     /**
@@ -616,9 +647,20 @@ final class HtmlReportGenerator
             background: rgba(97, 116, 143, 0.08);
         }
 
+        .section-description {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
         .card-grid {
             display: grid;
             gap: 10px;
+        }
+
+        .card-grid-discovery {
+            gap: 8px;
         }
 
         .report-card {
@@ -637,7 +679,7 @@ final class HtmlReportGenerator
         }
 
         .report-card-discovery {
-            padding: 12px 14px;
+            padding: 10px 14px;
             border-radius: 16px;
         }
 
@@ -663,18 +705,6 @@ final class HtmlReportGenerator
             gap: 8px;
             align-items: center;
             margin-bottom: 10px;
-        }
-
-        .card-meta-compact {
-            margin-bottom: 8px;
-        }
-
-        .card-kicker {
-            color: var(--muted);
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
         }
 
         .badge,
@@ -746,6 +776,20 @@ final class HtmlReportGenerator
             line-height: 1.45;
             font-weight: 700;
             color: var(--text);
+        }
+
+        .card-title-discovery {
+            font-size: 14px;
+            line-height: 1.35;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .card-subtitle {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.45;
         }
 
         .detail-block {

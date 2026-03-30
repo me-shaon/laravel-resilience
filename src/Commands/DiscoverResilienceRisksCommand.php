@@ -71,9 +71,13 @@ class DiscoverResilienceRisksCommand extends Command
 
         $this->newLine();
         $this->table(
-            ['Category', 'Findings'],
+            ['Category', 'Summary', 'Findings'],
             array_map(
-                static fn (string $category, array $findings): array => [$category, count($findings)],
+                static fn (string $category, array $findings): array => [
+                    $category,
+                    $findings[0]->summary(),
+                    count($findings),
+                ],
                 array_keys($groupedFindings),
                 $groupedFindings
             )
@@ -82,11 +86,10 @@ class DiscoverResilienceRisksCommand extends Command
         if ($mode === ConsoleOutputMode::Compact) {
             $this->newLine();
             $this->table(
-                ['Category', 'Summary', 'Location'],
+                ['Category', 'Location'],
                 array_map(
                     static fn ($finding): array => [
                         $finding->category(),
-                        $finding->summary(),
                         sprintf('%s:%d', $finding->relativePath(), $finding->line()),
                     ],
                     $report->findings()
@@ -96,11 +99,11 @@ class DiscoverResilienceRisksCommand extends Command
             foreach ($groupedFindings as $category => $findings) {
                 $this->newLine();
                 $this->info(sprintf('%s (%d)', $category, count($findings)));
+                $this->line(sprintf('Summary: %s', $findings[0]->summary()));
                 $this->table(
-                    ['Summary', 'Location'],
+                    ['Location'],
                     array_map(
                         static fn ($finding): array => [
-                            $finding->summary(),
                             sprintf('%s:%d', $finding->relativePath(), $finding->line()),
                         ],
                         $findings

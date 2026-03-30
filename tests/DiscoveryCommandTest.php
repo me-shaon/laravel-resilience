@@ -54,7 +54,6 @@ it('supports compact discovery output', function () {
 
     expect($exitCode)->toBe(0)
         ->and($output)->toContain('Category')
-        ->and($output)->toContain('Summary')
         ->and($output)->toContain('Location')
         ->and($output)->not->toContain('Excerpts:');
 });
@@ -94,7 +93,8 @@ it('writes an html discovery report and prints a preview url', function () {
         ->and(file_get_contents($reportPath))->toContain('Laravel Resilience discovery report')
         ->and(file_get_contents($reportPath))->toContain('Search this report')
         ->and(file_get_contents($reportPath))->toContain('Copy visible AI prompt')
-        ->and(file_get_contents($reportPath))->toContain('data-summary=');
+        ->and(file_get_contents($reportPath))->toContain('data-summary=')
+        ->and(file_get_contents($reportPath))->toContain('section-description');
 
     unlink($reportPath);
 });
