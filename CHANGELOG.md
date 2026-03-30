@@ -2,6 +2,34 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.7.0 - 2026-03-30
+
+### v0.7.0
+
+#### Summary
+
+- Adds an action-first resilience workflow with smarter suggestion output and a safe `resilience:scaffold` command that can generate draft resilience tests without overwriting customized work.
+
+#### Highlights
+
+- Refined `resilience:suggest` so it hides already-covered hotspots by default, groups repeated findings into hotspots, sorts by priority, and surfaces a short next action for each suggestion.
+- Added `php artisan resilience:scaffold` to generate draft Pest resilience tests from actionable suggestion hotspots.
+- Made scaffold generation safe to rerun with `--dry-run`, `--mode=create|update|force`, generated-file markers, and a manifest at `build/resilience-scaffold.json`.
+- Updated README and architecture/example guides to document the new discover → suggest → scaffold workflow and the rerun safety model.
+
+#### Verification
+
+- composer validate --no-check-publish
+- vendor/bin/pest
+- composer analyse
+- vendor/bin/pint --test
+
+#### Full Changelog
+
+- 65a9c3a Add safe resilience test scaffolding and docs
+- d665c5e Make suggestions more actionable by default
+- f1675f7 Deduplicate discovery summaries in reports
+
 ## v0.6.1 - 2026-03-30
 
 ### v0.6.1
