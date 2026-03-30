@@ -2,6 +2,35 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.6.0 - 2026-03-30
+
+### v0.6.0
+
+#### Summary
+
+- Adds scalable discovery and suggestion reporting with compact console views, standalone HTML reports, and AI-ready prompt export actions for follow-up review or implementation work.
+
+#### Highlights
+
+- Added `--compact` and `--view=default|compact|verbose` presentation modes to `resilience:discover` and `resilience:suggest`.
+- Added standalone HTML report generation with `--html` and browser-ready preview URLs with `--preview`.
+- Added polished HTML report pages with search, category filters, per-item cards, and richer summary sections for larger projects.
+- Added one-click copy actions in HTML reports so users can export either the full report or the current filtered subset as an AI-ready prompt.
+- Stabilized the package test harness by forcing an in-memory cache store during tests, fixing cache-related fault injection failures.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- composer format -- --test
+
+#### Full Changelog
+
+- 94e41ca Fix test cache setup for container fault injection
+- 9cbf1d6 Add AI prompt copy actions to HTML resilience reports
+- 7ea6603 Add compact and HTML reporting for resilience commands
+
 ## v0.5.1 - 2026-03-29
 
 ### v0.5.1
