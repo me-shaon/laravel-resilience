@@ -14,6 +14,11 @@ Use Laravel Resilience when you want to:
 
 In short: use mocks when you want fast unit-level feedback about your own code. Use Laravel Resilience when you want confidence that the real Laravel wiring and failure-handling path still behave correctly when a dependency breaks.
 
+If you want example-driven guidance for different codebase shapes, see:
+
+- [Example: Well-Structured App](guides/example-well-structured-app.md)
+- [Example: Messy Legacy App](guides/example-messy-legacy-app.md)
+
 ## Compatibility
 
 - PHP 8.1+
@@ -67,11 +72,27 @@ Scanned path: /project/app
 Files scanned: 18
 Findings: 4
 
-http:
-- Outbound HTTP call through the Laravel HTTP client. [app/Services/BillingService.php:18]
++---------------------+----------+
+| Category            | Findings |
++---------------------+----------+
+| http                | 1        |
+| queue               | 1        |
++---------------------+----------+
 
-queue:
-- Queue or bus dispatch point. [app/Listeners/SendInvoiceListener.php:27]
+http (1)
++----------------------------------------------+------------------------------------+
+| Summary                                      | Location                           |
++----------------------------------------------+------------------------------------+
+| Outbound HTTP call through the Laravel HTTP  | app/Services/BillingService.php:18 |
+| client.                                      |                                    |
++----------------------------------------------+------------------------------------+
+
+queue (1)
++----------------------------------+-------------------------------------------+
+| Summary                          | Location                                  |
++----------------------------------+-------------------------------------------+
+| Queue or bus dispatch point.     | app/Listeners/SendInvoiceListener.php:27  |
++----------------------------------+-------------------------------------------+
 
 $ php artisan resilience:suggest
 
@@ -79,9 +100,24 @@ Laravel Resilience suggestions
 Scanned path: /project/app
 Suggestions: 2
 
-http:
-- [high|missing] Wrap this outbound HTTP dependency behind a service boundary and add a resilience scenario or timeout/fallback test around it. [app/Services/BillingService.php:18]
-  Missing: timeout handling not detected; local fallback or exception handling not detected; related tests or resilience scenarios not detected
++---------------------+-------------+-----------+--------------+
+| Category            | Suggestions | Risk mix  | Coverage mix |
++---------------------+-------------+-----------+--------------+
+| http                | 1           | high:1    | missing:1    |
+| queue               | 1           | medium:1  | partial:1    |
++---------------------+-------------+-----------+--------------+
+
+http (1)
++----------+------------+------------------------------------+--------------------------------------------------------------+
+| Severity | Assessment | Location                           | Recommendation                                               |
++----------+------------+------------------------------------+--------------------------------------------------------------+
+| high     | missing    | app/Services/BillingService.php:18 | Wrap this outbound HTTP dependency behind a service boundary |
+|          |            |                                    | and add a resilience scenario or timeout/fallback test       |
+|          |            |                                    | around it. This is often a good place to extract network     |
+|          |            |                                    | logic out of controllers and listeners.                      |
++----------+------------+------------------------------------+--------------------------------------------------------------+
+Signals:
+- app/Services/BillingService.php:18: Missing: timeout handling not detected; local fallback or exception handling not detected; related tests or resilience scenarios not detected
 ```
 
 This makes the package easier to adopt because it can first help you answer:
@@ -91,6 +127,13 @@ This makes the package easier to adopt because it can first help you answer:
 - which flows already look partially protected?
 
 Then, once you know where the risky paths are, you can write targeted resilience tests for those flows.
+
+For larger projects, you can switch the presentation mode or generate a standalone report:
+
+- `php artisan resilience:discover --compact` keeps the terminal output flatter
+- `php artisan resilience:suggest --view=verbose` adds excerpts and richer signal context
+- `php artisan resilience:discover --html` writes a standalone HTML report under `build/resilience-reports`
+- `php artisan resilience:suggest --html=build/resilience-reports/suggest.html --preview` writes the report and prints a browser-ready `file://` URL
 
 ## A quick example
 
@@ -170,21 +213,31 @@ Typical workflow:
 4. assert that the fallback or degraded behavior happened
 5. clean up the active fault
 
-## Status
+## Architecture fit
 
-The package is in active development.
+Laravel Resilience works best when your application already has good dependency seams.
 
-Available today:
+Best-supported patterns:
 
-- fault injection for container-managed services
-- Laravel-aware helpers for HTTP, mail, cache, queue, and storage/filesystem
-- readable assertions for fallback-oriented tests
-- a scenario runner for repeatable resilience exercises
-- discovery and suggestion commands for finding resilience-sensitive code paths
+- dependencies resolved through Laravel container bindings
+- contracts or interfaces for critical external services
+- outbound integrations wrapped behind service classes
+- side effects isolated into jobs, actions, or dedicated services
+- Laravel-native HTTP, mail, cache, queue, and storage integrations used through their normal framework entry points
 
-Current limitation:
+Weakly supported patterns:
 
-- container and Laravel integration proxies currently support `timeout`, `exception`, and `latency` rules
+- direct `new SomeSdkClient()` calls inside controllers or jobs
+- static third-party SDK calls with no container seam
+- business logic and IO tightly coupled in the same class
+- hidden side effects spread across controllers and listeners
+
+These patterns are still worth scanning with `resilience:discover` and `resilience:suggest`, but they usually need some refactoring before fault injection can be as effective as it is in a well-structured app.
+
+If you want side-by-side examples of those two worlds, see:
+
+- [Example: Well-Structured App](guides/example-well-structured-app.md)
+- [Example: Messy Legacy App](guides/example-messy-legacy-app.md)
 
 ## Configuration and safety defaults
 
@@ -290,6 +343,10 @@ Available fluent fault types for container injection:
 - `timeout()`
 - `exception(Throwable $exception)`
 - `latency(int $milliseconds)`
+
+Current limitation:
+
+- container and Laravel integration proxies currently support `timeout`, `exception`, and `latency` rules
 
 Laravel Resilience wraps the target binding, intercepts method calls, applies the active rule, and restores the original binding when you deactivate the target or call `deactivateAll()`.
 
@@ -579,11 +636,13 @@ Important:
 
 ```bash
 php artisan resilience:run {scenario} [--json] [--dry-run] [--confirm-non-local]
-php artisan resilience:discover {path?} [--json] [--category=*]
-php artisan resilience:suggest {path?} [--json] [--category=*]
+php artisan resilience:discover {path?} [--json] [--category=*] [--compact] [--view=default|compact|verbose] [--html[=path]] [--preview]
+php artisan resilience:suggest {path?} [--json] [--category=*] [--compact] [--view=default|compact|verbose] [--html[=path]] [--preview]
 ```
 
 ## Development
+
+If you want the technical internals instead of the onboarding guide, see [How Laravel Resilience Works](guides/how-laravel-resilience-works.md).
 
 ```bash
 composer test

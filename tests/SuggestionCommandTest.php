@@ -8,8 +8,12 @@ it('prints readable grouped suggestions', function () {
 
     expect($exitCode)->toBe(0)
         ->and($output)->toContain('Laravel Resilience suggestions')
-        ->and($output)->toContain('http:')
-        ->and($output)->toContain('[high|missing]')
+        ->and($output)->toContain('Category')
+        ->and($output)->toContain('Severity')
+        ->and($output)->toContain('Assessment')
+        ->and($output)->toContain('Recommendation')
+        ->and($output)->toContain('http (')
+        ->and($output)->toContain('Signals:')
         ->and($output)->toContain('Evidence:')
         ->and($output)->toContain('Missing:');
 });
@@ -40,7 +44,74 @@ it('supports category filtering for suggestions', function () {
     $output = Artisan::output();
 
     expect($exitCode)->toBe(0)
-        ->and($output)->toContain('cache:')
-        ->and($output)->not->toContain('http:')
-        ->and($output)->not->toContain('mail:');
+        ->and($output)->toContain('cache (')
+        ->and($output)->not->toContain('http (')
+        ->and($output)->not->toContain('mail (');
+});
+
+it('supports compact suggestion output', function () {
+    $exitCode = Artisan::call('resilience:suggest', [
+        'path' => 'tests/Fixtures/Discovery',
+        '--compact' => true,
+    ]);
+
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('Category')
+        ->and($output)->toContain('Severity')
+        ->and($output)->toContain('Assessment')
+        ->and($output)->not->toContain('Signals:');
+});
+
+it('supports verbose suggestion output', function () {
+    $exitCode = Artisan::call('resilience:suggest', [
+        'path' => 'tests/Fixtures/Discovery',
+        '--view' => 'verbose',
+    ]);
+
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('Signals:')
+        ->and($output)->toContain('Excerpt:')
+        ->and($output)->toContain("Http::post('https://example.com/api/orders', ['id' => 1]);");
+});
+
+it('writes an html suggestion report and prints a preview url', function () {
+    $reportPath = sys_get_temp_dir().'/laravel-resilience-suggestion-report.html';
+
+    if (is_file($reportPath)) {
+        unlink($reportPath);
+    }
+
+    $exitCode = Artisan::call('resilience:suggest', [
+        'path' => 'tests/Fixtures/Discovery',
+        '--html' => $reportPath,
+        '--preview' => true,
+    ]);
+
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('HTML report:')
+        ->and($output)->toContain('Preview URL: file://')
+        ->and(is_file($reportPath))->toBeTrue()
+        ->and(file_get_contents($reportPath))->toContain('Laravel Resilience suggestion report')
+        ->and(file_get_contents($reportPath))->toContain('Search this report');
+
+    unlink($reportPath);
+});
+
+it('rejects compact and verbose suggestion modes together', function () {
+    $exitCode = Artisan::call('resilience:suggest', [
+        'path' => 'tests/Fixtures/Discovery',
+        '--compact' => true,
+        '--view' => 'verbose',
+    ]);
+
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(2)
+        ->and($output)->toContain('cannot be combined');
 });
