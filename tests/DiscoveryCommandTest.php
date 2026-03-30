@@ -92,7 +92,9 @@ it('writes an html discovery report and prints a preview url', function () {
         ->and($output)->toContain('Preview URL: file://')
         ->and(is_file($reportPath))->toBeTrue()
         ->and(file_get_contents($reportPath))->toContain('Laravel Resilience discovery report')
-        ->and(file_get_contents($reportPath))->toContain('Search this report');
+        ->and(file_get_contents($reportPath))->toContain('Search this report')
+        ->and(file_get_contents($reportPath))->toContain('Copy visible AI prompt')
+        ->and(file_get_contents($reportPath))->toContain('data-summary=');
 
     unlink($reportPath);
 });

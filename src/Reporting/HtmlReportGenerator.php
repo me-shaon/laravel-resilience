@@ -69,6 +69,7 @@ final class HtmlReportGenerator
         }
 
         return $this->renderPage(
+            reportKind: 'discovery',
             title: 'Laravel Resilience discovery report',
             subtitle: 'Scan the codebase for resilience-relevant patterns.',
             stats: [
@@ -116,6 +117,7 @@ final class HtmlReportGenerator
         }
 
         return $this->renderPage(
+            reportKind: 'suggestion',
             title: 'Laravel Resilience suggestion report',
             subtitle: 'Review practical next steps from discovery findings.',
             stats: [
@@ -135,7 +137,7 @@ final class HtmlReportGenerator
     private function renderDiscoveryCard(DiscoveryFinding $finding, ConsoleOutputMode $mode): string
     {
         $parts = [
-            '<article class="report-card" data-entry data-category="'.$this->escape($finding->category()).'" data-search="'.$this->escape($this->searchIndex([
+            '<article class="report-card" data-entry data-category="'.$this->escape($finding->category()).'" data-location="'.$this->escape($this->location($finding->relativePath(), $finding->line())).'" data-summary="'.$this->escape($finding->summary()).'" data-excerpt="'.$this->escape($finding->excerpt()).'" data-search="'.$this->escape($this->searchIndex([
                 $finding->category(),
                 $finding->summary(),
                 $finding->relativePath(),
@@ -164,7 +166,7 @@ final class HtmlReportGenerator
     {
         $finding = $suggestion->finding();
         $parts = [
-            '<article class="report-card" data-entry data-category="'.$this->escape($suggestion->category()).'" data-search="'.$this->escape($this->searchIndex([
+            '<article class="report-card" data-entry data-category="'.$this->escape($suggestion->category()).'" data-location="'.$this->escape($this->location($finding->relativePath(), $finding->line())).'" data-severity="'.$this->escape($suggestion->severity()).'" data-assessment="'.$this->escape($suggestion->assessment()).'" data-recommendation="'.$this->escape($suggestion->recommendation()).'" data-evidence="'.$this->escape(implode(' || ', $suggestion->evidence())).'" data-missing="'.$this->escape(implode(' || ', $suggestion->missingSignals())).'" data-excerpt="'.$this->escape($finding->excerpt()).'" data-search="'.$this->escape($this->searchIndex([
                 $suggestion->category(),
                 $suggestion->severity(),
                 $suggestion->assessment(),
@@ -241,6 +243,7 @@ final class HtmlReportGenerator
      * @param  array<int, array<int, string>>  $summaryRows
      */
     private function renderPage(
+        string $reportKind,
         string $title,
         string $subtitle,
         array $stats,
@@ -444,6 +447,43 @@ final class HtmlReportGenerator
             color: var(--text);
         }
 
+        .toolbar-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .toolbar-button {
+            border: 1px solid transparent;
+            background: linear-gradient(135deg, #0f766e, #0b5ed7);
+            color: #ffffff;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            box-shadow: 0 12px 24px rgba(15, 118, 110, 0.18);
+        }
+
+        .toolbar-button:hover {
+            transform: translateY(-1px);
+        }
+
+        .toolbar-button.secondary {
+            background: var(--panel-strong);
+            color: var(--text);
+            border-color: var(--border);
+            box-shadow: none;
+        }
+
+        .toolbar-meta {
+            margin: 0 0 18px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
         .filter-row {
             display: flex;
             flex-wrap: wrap;
@@ -638,7 +678,7 @@ final class HtmlReportGenerator
     </style>
 </head>
 <body>
-    <main class="page">
+    <main class="page" data-report-kind="'.$this->escape($reportKind).'" data-report-title="'.$this->escape($title).'" data-report-mode="'.$this->escape($stats[count($stats) - 1]['value'] ?? '').'" data-base-path="'.$this->escape($stats[0]['value'] ?? '').'">
         <section class="hero">
             <span class="eyebrow">Laravel Resilience</span>
             <h1>'.$this->escape($title).'</h1>
@@ -671,7 +711,13 @@ final class HtmlReportGenerator
 
             <div class="toolbar">
                 <input type="search" id="report-search" placeholder="Search this report">
+                <div class="toolbar-actions">
+                    <button type="button" class="toolbar-button" id="copy-visible-prompt">Copy visible AI prompt</button>
+                    <button type="button" class="toolbar-button secondary" id="copy-full-prompt">Copy full AI prompt</button>
+                </div>
             </div>
+
+            <p class="toolbar-meta" id="copy-status">Filter the report if you want a narrower prompt, then copy the visible items for an AI agent review.</p>
 
             <div class="filter-row">
                 <button type="button" class="filter-chip is-active" data-filter="all">All categories</button>
@@ -687,6 +733,10 @@ final class HtmlReportGenerator
             const search = document.getElementById("report-search");
             const chips = Array.from(document.querySelectorAll("[data-filter]"));
             const sections = Array.from(document.querySelectorAll("[data-section]"));
+            const copyVisibleButton = document.getElementById("copy-visible-prompt");
+            const copyFullButton = document.getElementById("copy-full-prompt");
+            const copyStatus = document.getElementById("copy-status");
+            const page = document.querySelector(".page");
             let activeFilter = "all";
 
             const applyFilters = () => {
@@ -711,6 +761,135 @@ final class HtmlReportGenerator
                 });
             };
 
+            const decodeList = (value) => {
+                if (! value) {
+                    return [];
+                }
+
+                return value
+                    .split(" || ")
+                    .map((item) => item.trim())
+                    .filter(Boolean);
+            };
+
+            const buildPrompt = (entries, scopeLabel) => {
+                const reportKind = page.dataset.reportKind || "report";
+                const reportMode = page.dataset.reportMode || "Default";
+                const basePath = page.dataset.basePath || "";
+                const title = page.dataset.reportTitle || "Laravel Resilience report";
+                const visibleCategories = Array.from(new Set(entries.map((entry) => entry.dataset.category || "").filter(Boolean)));
+                const promptHeader = reportKind === "suggestion"
+                    ? [
+                        "You are reviewing Laravel Resilience suggestions for a Laravel codebase.",
+                        "",
+                        "Please verify each suggestion against the code before acting on it.",
+                        "Prioritize the work by severity and assessment, identify false positives if any, and propose or implement the most valuable fixes, fallbacks, abstractions, and tests.",
+                        "Return:",
+                        "- prioritized issues",
+                        "- concrete code or test changes",
+                        "- any suggestions that should be downgraded or skipped",
+                        "- assumptions or missing context",
+                    ]
+                    : [
+                        "You are reviewing Laravel Resilience discovery findings for a Laravel codebase.",
+                        "",
+                        "Please verify whether each finding is real, group related issues where helpful, and propose or implement the most valuable resilience tests, abstractions, fallbacks, and follow-up checks.",
+                        "Call out false positives if any.",
+                        "Return:",
+                        "- prioritized findings",
+                        "- recommended fixes or resilience tests",
+                        "- any findings that can be safely ignored",
+                        "- assumptions or missing context",
+                    ];
+
+                const promptEntries = entries.map((entry, index) => {
+                    const lines = [
+                        (index + 1) + ". Category: " + (entry.dataset.category || ""),
+                    ];
+
+                    if (reportKind === "suggestion") {
+                        lines.push("   Severity: " + (entry.dataset.severity || ""));
+                        lines.push("   Assessment: " + (entry.dataset.assessment || ""));
+                        lines.push("   Recommendation: " + (entry.dataset.recommendation || ""));
+
+                        const evidence = decodeList(entry.dataset.evidence || "");
+                        const missing = decodeList(entry.dataset.missing || "");
+
+                        if (evidence.length > 0) {
+                            lines.push("   Evidence: " + evidence.join("; "));
+                        }
+
+                        if (missing.length > 0) {
+                            lines.push("   Missing signals: " + missing.join("; "));
+                        }
+                    } else {
+                        lines.push("   Summary: " + (entry.dataset.summary || ""));
+                    }
+
+                    lines.push("   Location: " + (entry.dataset.location || ""));
+
+                    if (entry.dataset.excerpt) {
+                        lines.push("   Excerpt: " + entry.dataset.excerpt);
+                    }
+
+                    return lines.join("\n");
+                });
+
+                return [
+                    ...promptHeader,
+                    "",
+                    "Context:",
+                    "- Report title: " + title,
+                    "- Scope: " + scopeLabel,
+                    "- Base path: " + basePath,
+                    "- Report mode: " + reportMode,
+                    "- Categories: " + (visibleCategories.length > 0 ? visibleCategories.join(", ") : "none"),
+                    "- Item count: " + entries.length,
+                    "",
+                    reportKind === "suggestion" ? "Suggestions:" : "Discovery findings:",
+                    ...promptEntries,
+                ].join("\n");
+            };
+
+            const copyText = async (text) => {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return;
+                }
+
+                const textarea = document.createElement("textarea");
+                textarea.value = text;
+                textarea.setAttribute("readonly", "readonly");
+                textarea.style.position = "absolute";
+                textarea.style.left = "-9999px";
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textarea);
+            };
+
+            const handleCopy = async (visibleOnly) => {
+                const entries = Array.from(document.querySelectorAll("[data-entry]")).filter((entry) => ! visibleOnly || ! entry.hidden);
+
+                if (entries.length === 0) {
+                    copyStatus.textContent = "Nothing is currently visible to copy. Adjust the search or category filter first.";
+                    return;
+                }
+
+                const scopeLabel = visibleOnly
+                    ? "Visible report items after the current search/filter state"
+                    : "Entire HTML report";
+
+                try {
+                    await copyText(buildPrompt(entries, scopeLabel));
+                    copyStatus.textContent = visibleOnly
+                        ? "Copied an AI-ready prompt for the visible report items."
+                        : "Copied an AI-ready prompt for the full report.";
+                } catch (error) {
+                    copyStatus.textContent = "Copy failed in this browser. You can still inspect the report and copy manually.";
+                }
+            };
+
             chips.forEach((chip) => {
                 chip.addEventListener("click", () => {
                     activeFilter = (chip.dataset.filter || "all").toLowerCase();
@@ -721,6 +900,8 @@ final class HtmlReportGenerator
             });
 
             search.addEventListener("input", applyFilters);
+            copyVisibleButton.addEventListener("click", () => { void handleCopy(true); });
+            copyFullButton.addEventListener("click", () => { void handleCopy(false); });
             applyFilters();
         }());
     </script>

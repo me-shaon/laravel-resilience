@@ -134,6 +134,7 @@ For larger projects, you can switch the presentation mode or generate a standalo
 - `php artisan resilience:suggest --view=verbose` adds excerpts and richer signal context
 - `php artisan resilience:discover --html` writes a standalone HTML report under `build/resilience-reports`
 - `php artisan resilience:suggest --html=build/resilience-reports/suggest.html --preview` writes the report and prints a browser-ready `file://` URL
+- the HTML report includes copy buttons for full-report or filtered AI-ready prompts, so you can narrow the view and paste the result into an agent for follow-up fixes or review
 
 ## A quick example
 

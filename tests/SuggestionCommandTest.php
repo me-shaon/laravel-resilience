@@ -98,7 +98,9 @@ it('writes an html suggestion report and prints a preview url', function () {
         ->and($output)->toContain('Preview URL: file://')
         ->and(is_file($reportPath))->toBeTrue()
         ->and(file_get_contents($reportPath))->toContain('Laravel Resilience suggestion report')
-        ->and(file_get_contents($reportPath))->toContain('Search this report');
+        ->and(file_get_contents($reportPath))->toContain('Search this report')
+        ->and(file_get_contents($reportPath))->toContain('Copy full AI prompt')
+        ->and(file_get_contents($reportPath))->toContain('data-recommendation=');
 
     unlink($reportPath);
 });
