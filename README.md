@@ -14,11 +14,6 @@ Use Laravel Resilience when you want to:
 
 In short: use mocks when you want fast unit-level feedback about your own code. Use Laravel Resilience when you want confidence that the real Laravel wiring and failure-handling path still behave correctly when a dependency breaks.
 
-If you want example-driven guidance for different codebase shapes, see:
-
-- [Example: Well-Structured App](guides/example-well-structured-app.md)
-- [Example: Messy Legacy App](guides/example-messy-legacy-app.md)
-
 ## Compatibility
 
 - PHP 8.1+
@@ -128,13 +123,31 @@ This makes the package easier to adopt because it can first help you answer:
 
 Then, once you know where the risky paths are, you can write targeted resilience tests for those flows.
 
-For larger projects, you can switch the presentation mode or generate a standalone report:
+For larger projects, you do not have to stay with the default terminal layout.
 
-- `php artisan resilience:discover --compact` keeps the terminal output flatter
-- `php artisan resilience:suggest --view=verbose` adds excerpts and richer signal context
-- `php artisan resilience:discover --html` writes a standalone HTML report under `build/resilience-reports`
-- `php artisan resilience:suggest --html=build/resilience-reports/suggest.html --preview` writes the report and prints a browser-ready `file://` URL
-- the HTML report includes copy buttons for full-report or filtered AI-ready prompts, so you can narrow the view and paste the result into an agent for follow-up fixes or review
+Output options:
+
+- Default output: grouped tables in the terminal. Use this when you want a readable overview without extra detail.
+- `--compact`: flattens the report into a denser table. Use this when your scan is large and you want to review more rows at once in the terminal.
+- `--view=verbose`: keeps the grouped tables but also includes excerpts and richer signal detail. Use this when you are actively inspecting why a finding or suggestion appeared.
+- `--html`: writes a standalone HTML report under `build/resilience-reports` by default. Use this when the CLI output is too long to comfortably review.
+- `--html=path/to/report.html`: writes the HTML report to a specific location you choose.
+- `--preview`: prints a browser-ready `file://` URL for the generated HTML report so you can open it immediately.
+
+HTML report workflow:
+
+- the HTML report adds search, category filters, and a more spacious layout for large scans
+- it includes copy buttons for full-report or filtered AI-ready prompts
+- this makes it easy to narrow the report in the browser and paste the current result into an AI agent for review, validation, or follow-up fixes
+
+Examples:
+
+```bash
+php artisan resilience:discover --compact
+php artisan resilience:suggest --view=verbose
+php artisan resilience:discover --html
+php artisan resilience:suggest --html=build/resilience-reports/suggest.html --preview
+```
 
 ## A quick example
 
