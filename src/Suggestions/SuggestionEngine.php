@@ -252,6 +252,10 @@ final class SuggestionEngine
 
             $contents = $this->files->get($path);
 
+            if (str_contains($contents, 'Generated scaffold:')) {
+                continue;
+            }
+
             foreach ($referencePatterns as $pattern) {
                 if ($this->matches($contents, $pattern)) {
                     return true;

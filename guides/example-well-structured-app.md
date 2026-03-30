@@ -123,6 +123,7 @@ Typical workflow:
 ```bash
 php artisan resilience:discover app/Services
 php artisan resilience:suggest app/Services
+php artisan resilience:scaffold app/Services --dry-run
 ```
 
 In a clean architecture, the suggestions often become:
@@ -132,6 +133,8 @@ In a clean architecture, the suggestions often become:
 - verify duplicate-side-effect protection around this queue path
 
 rather than broad refactoring advice.
+
+From there, `resilience:scaffold` can generate draft tests for the still-actionable hotspots, which usually means the team only needs to fill in the real application flow and final assertions.
 
 ## Takeaway
 

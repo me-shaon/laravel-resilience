@@ -43,19 +43,22 @@ The easiest onboarding path is:
 
 1. run the discovery command to find resilience-sensitive parts of your app
 2. run the suggestion command to see where resilience coverage is missing
-3. add focused fault-injection tests only for the flows that matter most
+3. scaffold draft resilience tests for the highest-value hotspots
+4. refine the generated drafts into real application-specific resilience tests
 
 Start with:
 
 ```bash
 php artisan resilience:discover
 php artisan resilience:suggest
+php artisan resilience:scaffold
 ```
 
 What these commands help you see:
 
 - `resilience:discover` shows code paths that look resilience-sensitive, such as HTTP calls, queue dispatches, cache usage, storage writes, or direct construction of external clients
 - `resilience:suggest` turns those findings into practical next steps, such as adding a fallback test, extracting a dependency behind a service boundary, or reviewing duplicate-side-effect protection
+- `resilience:scaffold` turns actionable suggestion hotspots into draft Pest tests under `tests/Resilience/Generated`
 
 Example:
 
@@ -125,6 +128,22 @@ This makes the package easier to adopt because it can first help you answer:
 
 Then, once you know where the risky paths are, you can write targeted resilience tests for those flows.
 
+If you want Laravel Resilience to generate the first draft for you, use the scaffold command after `resilience:suggest`:
+
+```bash
+php artisan resilience:scaffold
+php artisan resilience:scaffold --dry-run
+php artisan resilience:scaffold --mode=update
+```
+
+The scaffold command is designed to be rerun safely:
+
+- it writes draft tests into `tests/Resilience/Generated`
+- it tracks generated hotspots in `build/resilience-scaffold.json`
+- it skips existing scaffold files in normal create mode
+- it does not overwrite customized scaffold files in update mode
+- it only overwrites generated files when you explicitly use `--mode=force`
+
 For larger projects, you do not have to stay with the default terminal layout.
 
 Output options:
@@ -137,6 +156,8 @@ Output options:
 - `--html`: writes a standalone HTML report under `build/resilience-reports` by default. Use this when the CLI output is too long to comfortably review.
 - `--html=path/to/report.html`: writes the HTML report to a specific location you choose.
 - `--preview`: prints a browser-ready `file://` URL for the generated HTML report so you can open it immediately.
+- `resilience:scaffold --dry-run`: previews which draft tests would be generated without writing files.
+- `resilience:scaffold --mode=create|update|force`: controls whether generated scaffold files are only created, refreshed, or forcibly replaced.
 
 HTML report workflow:
 
@@ -150,6 +171,7 @@ Examples:
 php artisan resilience:discover --compact
 php artisan resilience:suggest --view=verbose
 php artisan resilience:suggest --include-covered
+php artisan resilience:scaffold --dry-run
 php artisan resilience:discover --html
 php artisan resilience:suggest --html=build/resilience-reports/suggest.html --preview
 ```
@@ -614,6 +636,31 @@ Suggestions include:
 
 By default, the command hides `covered` suggestions so the output stays tighter and more actionable. Use `--include-covered` when you want the broader audit view.
 
+## Scaffold command
+
+The scaffold command takes actionable suggestion hotspots and generates draft Pest tests for them.
+
+Run it with:
+
+```bash
+php artisan resilience:scaffold
+php artisan resilience:scaffold app/Services
+php artisan resilience:scaffold --dry-run
+php artisan resilience:scaffold --mode=update
+php artisan resilience:scaffold --include-covered
+```
+
+Scaffold behavior:
+
+- output defaults to `tests/Resilience/Generated`
+- a manifest is written to `build/resilience-scaffold.json`
+- generated tests are skipped by default until you replace the placeholders with real application flows and assertions
+- rerunning in `create` mode skips existing generated files
+- rerunning in `update` mode refreshes only managed scaffold files that have not been customized
+- `force` mode overwrites managed scaffold files when you explicitly want to regenerate them
+
+This gives developers a starting point without pretending the package can infer the exact fallback assertions for every application.
+
 ## Advanced fault rules
 
 If you need more control than the fluent builder provides, you can work directly with `FaultRule` and `FaultTarget`.
@@ -659,6 +706,7 @@ Important:
 php artisan resilience:run {scenario} [--json] [--dry-run] [--confirm-non-local]
 php artisan resilience:discover {path?} [--json] [--category=*] [--compact] [--view=default|compact|verbose] [--html[=path]] [--preview]
 php artisan resilience:suggest {path?} [--json] [--category=*] [--include-covered] [--compact] [--view=default|compact|verbose] [--html[=path]] [--preview]
+php artisan resilience:scaffold {path?} [--category=*] [--include-covered] [--dry-run] [--mode=create|update|force] [--format=pest] [--output=path] [--manifest=path]
 ```
 
 ## Development

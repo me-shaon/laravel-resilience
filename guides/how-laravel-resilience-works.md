@@ -14,18 +14,19 @@ Laravel Resilience is built around one core idea:
 - observe the real fallback, retry, logging, event, job, or degraded-response behavior
 
 The package does not try to replace all of Laravel testing.
-Instead, it adds a deterministic failure layer on top of normal container resolution, Laravel integrations, scenarios, discovery, and suggestion workflows.
+Instead, it adds a deterministic failure layer on top of normal container resolution, Laravel integrations, scenarios, discovery, suggestion, and scaffold workflows.
 
 ## Main subsystems
 
-The package is easiest to understand as six cooperating subsystems:
+The package is easiest to understand as seven cooperating subsystems:
 
 1. fault modeling
 2. fault activation and tracking
 3. runtime injection
 4. scenario execution
 5. discovery and suggestion analysis
-6. safety guardrails
+6. scaffold generation
+7. safety guardrails
 
 ## 1. Fault modeling
 
@@ -332,7 +333,32 @@ It can also say:
 
 That makes the output more useful during architectural review and test planning.
 
-## 6. Safety guardrails
+## 6. Scaffold generation
+
+Scaffolding lives in:
+
+- [ScaffoldResilienceTestsCommand.php](../src/Commands/ScaffoldResilienceTestsCommand.php)
+- [ResilienceTestScaffolder.php](../src/Scaffolding/ResilienceTestScaffolder.php)
+- [ScaffoldReport.php](../src/Scaffolding/ScaffoldReport.php)
+- [ScaffoldedItem.php](../src/Scaffolding/ScaffoldedItem.php)
+
+The scaffold command builds on actionable suggestions instead of working directly from raw discovery findings.
+
+At a high level it:
+
+1. runs the suggestion engine for the selected path and categories
+2. skips `covered` hotspots by default unless `--include-covered` is requested
+3. assigns deterministic hotspot IDs and output paths
+4. writes draft Pest tests into a dedicated generated-test directory
+5. records generated hashes in a scaffold manifest
+6. avoids overwriting customized generated files unless `--mode=force` is used
+
+This is intentionally conservative.
+
+The package can suggest likely resilience gaps, but it cannot know every application's correct fallback behavior.
+So scaffolding is designed to give you a strong starting point, not a false sense of finished resilience coverage.
+
+## 7. Safety guardrails
 
 Safety enforcement is centered on:
 

@@ -4,11 +4,13 @@ namespace MeShaon\LaravelResilience;
 
 use MeShaon\LaravelResilience\Commands\DiscoverResilienceRisksCommand;
 use MeShaon\LaravelResilience\Commands\RunResilienceScenarioCommand;
+use MeShaon\LaravelResilience\Commands\ScaffoldResilienceTestsCommand;
 use MeShaon\LaravelResilience\Commands\SuggestResilienceImprovementsCommand;
 use MeShaon\LaravelResilience\Discovery\DiscoveryScanner;
 use MeShaon\LaravelResilience\Faults\FaultManager;
 use MeShaon\LaravelResilience\Faults\Injectors\ContainerFaultInjector;
 use MeShaon\LaravelResilience\Reporting\HtmlReportGenerator;
+use MeShaon\LaravelResilience\Scaffolding\ResilienceTestScaffolder;
 use MeShaon\LaravelResilience\Scenarios\ScenarioRunner;
 use MeShaon\LaravelResilience\Suggestions\SuggestionEngine;
 use MeShaon\LaravelResilience\Support\EnvironmentGuard;
@@ -24,6 +26,7 @@ class LaravelResilienceServiceProvider extends PackageServiceProvider
             ->hasConfigFile()
             ->hasCommand(DiscoverResilienceRisksCommand::class)
             ->hasCommand(RunResilienceScenarioCommand::class)
+            ->hasCommand(ScaffoldResilienceTestsCommand::class)
             ->hasCommand(SuggestResilienceImprovementsCommand::class);
     }
 
@@ -34,6 +37,7 @@ class LaravelResilienceServiceProvider extends PackageServiceProvider
         $this->app->singleton(FaultManager::class);
         $this->app->singleton(ContainerFaultInjector::class);
         $this->app->singleton(HtmlReportGenerator::class);
+        $this->app->singleton(ResilienceTestScaffolder::class);
         $this->app->singleton(ScenarioRunner::class);
         $this->app->singleton(SuggestionEngine::class);
 

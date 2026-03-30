@@ -142,9 +142,10 @@ For a messy codebase, the best path is usually:
 
 1. run `resilience:discover`
 2. run `resilience:suggest`
-3. pick one high-value failure path
-4. create one container seam around it
-5. add one focused resilience test
+3. run `resilience:scaffold --dry-run` to preview draft tests for the most actionable hotspots
+4. pick one high-value failure path
+5. create one container seam around it
+6. turn one generated draft into a focused resilience test
 
 That is enough to start getting value without demanding a whole-application rewrite.
 
