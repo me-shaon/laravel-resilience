@@ -11,11 +11,12 @@ it('prints readable grouped suggestions', function () {
         ->and($output)->toContain('Category')
         ->and($output)->toContain('Severity')
         ->and($output)->toContain('Assessment')
+        ->and($output)->toContain('Action')
         ->and($output)->toContain('Recommendation')
         ->and($output)->toContain('http (')
-        ->and($output)->toContain('Signals:')
-        ->and($output)->toContain('Evidence:')
-        ->and($output)->toContain('Missing:');
+        ->and($output)->toContain('Next focus:')
+        ->and($output)->toContain('timeout handling not detected')
+        ->and($output)->not->toContain('GuardedBillingService.php');
 });
 
 it('supports json output for suggestions', function () {
@@ -30,6 +31,7 @@ it('supports json output for suggestions', function () {
         ->and($output)->toContain('"suggestions"')
         ->and($output)->toContain('"severity"')
         ->and($output)->toContain('"assessment"')
+        ->and($output)->toContain('"action"')
         ->and($output)->toContain('"evidence"')
         ->and($output)->toContain('"missing_signals"')
         ->and($output)->toContain('ResilienceSampleController.php');
@@ -61,6 +63,7 @@ it('supports compact suggestion output', function () {
         ->and($output)->toContain('Category')
         ->and($output)->toContain('Severity')
         ->and($output)->toContain('Assessment')
+        ->and($output)->toContain('Action')
         ->and($output)->not->toContain('Signals:');
 });
 
@@ -76,6 +79,19 @@ it('supports verbose suggestion output', function () {
         ->and($output)->toContain('Signals:')
         ->and($output)->toContain('Excerpt:')
         ->and($output)->toContain("Http::post('https://example.com/api/orders', ['id' => 1]);");
+});
+
+it('can include covered suggestions when requested', function () {
+    $exitCode = Artisan::call('resilience:suggest', [
+        'path' => 'tests/Fixtures/Discovery',
+        '--include-covered' => true,
+        '--category' => ['http'],
+    ]);
+
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('GuardedBillingService.php');
 });
 
 it('writes an html suggestion report and prints a preview url', function () {
@@ -100,7 +116,8 @@ it('writes an html suggestion report and prints a preview url', function () {
         ->and(file_get_contents($reportPath))->toContain('Laravel Resilience suggestion report')
         ->and(file_get_contents($reportPath))->toContain('Search this report')
         ->and(file_get_contents($reportPath))->toContain('Copy full AI prompt')
-        ->and(file_get_contents($reportPath))->toContain('data-recommendation=');
+        ->and(file_get_contents($reportPath))->toContain('data-recommendation=')
+        ->and(file_get_contents($reportPath))->toContain('data-action=');
 
     unlink($reportPath);
 });

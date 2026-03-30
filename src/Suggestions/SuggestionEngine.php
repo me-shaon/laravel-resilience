@@ -54,7 +54,7 @@ final class SuggestionEngine
     /**
      * @param  array<int, string>  $categories
      */
-    public function suggest(?string $basePath = null, array $categories = []): SuggestionReport
+    public function suggest(?string $basePath = null, array $categories = [], bool $includeCovered = false): SuggestionReport
     {
         $discoveryReport = $this->scanner->scan($basePath, $categories);
         $suggestions = [];
@@ -72,6 +72,7 @@ final class SuggestionEngine
                 $finding->category(),
                 $rule['severity'],
                 $analysis['assessment'],
+                $this->actionFor($finding, $analysis['missing']),
                 $this->recommendationFor(
                     $finding,
                     $rule['recommendation'],
@@ -81,11 +82,15 @@ final class SuggestionEngine
                 ),
                 $finding,
                 $analysis['evidence'],
-                $analysis['missing']
+                $analysis['missing'],
+                [$finding->line()]
             );
         }
 
-        return new SuggestionReport($discoveryReport->basePath(), $suggestions);
+        return new SuggestionReport(
+            $discoveryReport->basePath(),
+            $this->aggregateSuggestions($suggestions, $includeCovered)
+        );
     }
 
     /**
@@ -110,6 +115,40 @@ final class SuggestionEngine
             'partial' => $recommendation.' Some safeguards are already present, but the missing signals below suggest there is still room to tighten resilience coverage.',
             default => $recommendation,
         };
+    }
+
+    /**
+     * @param  array<int, string>  $missingSignals
+     */
+    private function actionFor(DiscoveryFinding $finding, array $missingSignals): string
+    {
+        if ($finding->category() === 'client-construction' || $finding->category() === 'concrete-dependency') {
+            return 'extract dependency seam';
+        }
+
+        if (in_array('timeout handling not detected', $missingSignals, true)
+            && in_array('local fallback or exception handling not detected', $missingSignals, true)) {
+            return 'add timeout and fallback';
+        }
+
+        if (in_array('local fallback or exception handling not detected', $missingSignals, true)) {
+            return 'add fallback handling';
+        }
+
+        if (in_array('duplicate-side-effect guard not detected', $missingSignals, true)) {
+            return 'add idempotency guard';
+        }
+
+        if (in_array('related tests or resilience scenarios not detected', $missingSignals, true)) {
+            return 'add resilience test';
+        }
+
+        if (in_array('service or contract abstraction not detected', $missingSignals, true)
+            || in_array('contract or interface abstraction not detected', $missingSignals, true)) {
+            return 'introduce abstraction';
+        }
+
+        return 'review resilience coverage';
     }
 
     /**
@@ -221,6 +260,91 @@ final class SuggestionEngine
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<int, ResilienceSuggestion>  $suggestions
+     * @return array<int, ResilienceSuggestion>
+     */
+    private function aggregateSuggestions(array $suggestions, bool $includeCovered): array
+    {
+        $grouped = [];
+
+        foreach ($suggestions as $suggestion) {
+            if (! $includeCovered && $suggestion->assessment() === 'covered') {
+                continue;
+            }
+
+            $key = implode('|', [
+                $suggestion->category(),
+                $suggestion->finding()->relativePath(),
+                $suggestion->severity(),
+                $suggestion->assessment(),
+                $suggestion->action(),
+            ]);
+
+            if (! isset($grouped[$key])) {
+                $grouped[$key] = $suggestion;
+
+                continue;
+            }
+
+            $existing = $grouped[$key];
+            $grouped[$key] = new ResilienceSuggestion(
+                $existing->category(),
+                $existing->severity(),
+                $existing->assessment(),
+                $existing->action(),
+                $existing->recommendation(),
+                $existing->finding(),
+                array_values(array_unique([...$existing->evidence(), ...$suggestion->evidence()])),
+                array_values(array_unique([...$existing->missingSignals(), ...$suggestion->missingSignals()])),
+                $this->mergedLineNumbers($existing, $suggestion)
+            );
+        }
+
+        $aggregated = array_values($grouped);
+
+        usort($aggregated, fn (ResilienceSuggestion $left, ResilienceSuggestion $right): int => $this->sortKey($left) <=> $this->sortKey($right));
+
+        return $aggregated;
+    }
+
+    /**
+     * @return array{int, int, int, string, int}
+     */
+    private function sortKey(ResilienceSuggestion $suggestion): array
+    {
+        $severityRank = match ($suggestion->severity()) {
+            'high' => 0,
+            'medium' => 1,
+            default => 2,
+        };
+
+        $assessmentRank = match ($suggestion->assessment()) {
+            'missing' => 0,
+            'partial' => 1,
+            default => 2,
+        };
+
+        return [
+            $severityRank,
+            $assessmentRank,
+            -$suggestion->occurrenceCount(),
+            $suggestion->finding()->relativePath(),
+            min($suggestion->lineNumbers()),
+        ];
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function mergedLineNumbers(ResilienceSuggestion $left, ResilienceSuggestion $right): array
+    {
+        $lineNumbers = array_values(array_unique([...$left->lineNumbers(), ...$right->lineNumbers()]));
+        sort($lineNumbers);
+
+        return $lineNumbers;
     }
 
     private function looksLikeCoverageFile(string $path): bool

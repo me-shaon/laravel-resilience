@@ -95,24 +95,26 @@ Laravel Resilience suggestions
 Scanned path: /project/app
 Suggestions: 2
 
-+---------------------+-------------+-----------+--------------+
-| Category            | Suggestions | Risk mix  | Coverage mix |
-+---------------------+-------------+-----------+--------------+
-| http                | 1           | high:1    | missing:1    |
-| queue               | 1           | medium:1  | partial:1    |
-+---------------------+-------------+-----------+--------------+
++---------------------+-------------+-----------+--------------+----------------------+
+| Category            | Suggestions | Risk mix  | Coverage mix | Action mix           |
++---------------------+-------------+-----------+--------------+----------------------+
+| http                | 1           | high:1    | missing:1    | add timeout and      |
+|                     |             |           |              | fallback:1           |
+| queue               | 1           | medium:1  | partial:1    | add resilience       |
+|                     |             |           |              | test:1               |
++---------------------+-------------+-----------+--------------+----------------------+
 
 http (1)
-+----------+------------+------------------------------------+--------------------------------------------------------------+
-| Severity | Assessment | Location                           | Recommendation                                               |
-+----------+------------+------------------------------------+--------------------------------------------------------------+
-| high     | missing    | app/Services/BillingService.php:18 | Wrap this outbound HTTP dependency behind a service boundary |
-|          |            |                                    | and add a resilience scenario or timeout/fallback test       |
-|          |            |                                    | around it. This is often a good place to extract network     |
-|          |            |                                    | logic out of controllers and listeners.                      |
-+----------+------------+------------------------------------+--------------------------------------------------------------+
-Signals:
-- app/Services/BillingService.php:18: Missing: timeout handling not detected; local fallback or exception handling not detected; related tests or resilience scenarios not detected
++----------+------------+--------------------------+------------------------------------+--------------------------------------------------------------+
+| Severity | Assessment | Action                   | Hotspot                            | Recommendation                                               |
++----------+------------+--------------------------+------------------------------------+--------------------------------------------------------------+
+| high     | missing    | add timeout and fallback | app/Services/BillingService.php:18 | Wrap this outbound HTTP dependency behind a service boundary |
+|          |            |                          |                                    | and add a resilience scenario or timeout/fallback test       |
+|          |            |                          |                                    | around it. This is often a good place to extract network     |
+|          |            |                          |                                    | logic out of controllers and listeners.                      |
++----------+------------+--------------------------+------------------------------------+--------------------------------------------------------------+
+Next focus:
+- app/Services/BillingService.php:18: timeout handling not detected; local fallback or exception handling not detected; related tests or resilience scenarios not detected
 ```
 
 This makes the package easier to adopt because it can first help you answer:
@@ -130,6 +132,8 @@ Output options:
 - Default output: grouped tables in the terminal. Use this when you want a readable overview without extra detail.
 - `--compact`: flattens the report into a denser table. Use this when your scan is large and you want to review more rows at once in the terminal.
 - `--view=verbose`: keeps the grouped tables but also includes excerpts and richer signal detail. Use this when you are actively inspecting why a finding or suggestion appeared.
+- `resilience:suggest` hides `covered` suggestions by default so the report stays focused on work that is still likely worth doing.
+- `--include-covered`: brings already-covered suggestions back when you want a broader audit instead of an action-first view.
 - `--html`: writes a standalone HTML report under `build/resilience-reports` by default. Use this when the CLI output is too long to comfortably review.
 - `--html=path/to/report.html`: writes the HTML report to a specific location you choose.
 - `--preview`: prints a browser-ready `file://` URL for the generated HTML report so you can open it immediately.
@@ -145,6 +149,7 @@ Examples:
 ```bash
 php artisan resilience:discover --compact
 php artisan resilience:suggest --view=verbose
+php artisan resilience:suggest --include-covered
 php artisan resilience:discover --html
 php artisan resilience:suggest --html=build/resilience-reports/suggest.html --preview
 ```
@@ -596,16 +601,18 @@ php artisan resilience:suggest
 php artisan resilience:suggest app/Services
 php artisan resilience:suggest --json
 php artisan resilience:suggest --category=cache
+php artisan resilience:suggest --include-covered
 ```
 
 Suggestions include:
 
 - a severity level
 - an assessment of `missing`, `partial`, or `covered`
+- a short next action for the most likely follow-up work
 - evidence already detected in the codebase
 - missing signals that may need more work
 
-This makes the command more helpful than a generic warning because it tries to show both what is already present and what still appears to be missing.
+By default, the command hides `covered` suggestions so the output stays tighter and more actionable. Use `--include-covered` when you want the broader audit view.
 
 ## Advanced fault rules
 
@@ -651,7 +658,7 @@ Important:
 ```bash
 php artisan resilience:run {scenario} [--json] [--dry-run] [--confirm-non-local]
 php artisan resilience:discover {path?} [--json] [--category=*] [--compact] [--view=default|compact|verbose] [--html[=path]] [--preview]
-php artisan resilience:suggest {path?} [--json] [--category=*] [--compact] [--view=default|compact|verbose] [--html[=path]] [--preview]
+php artisan resilience:suggest {path?} [--json] [--category=*] [--include-covered] [--compact] [--view=default|compact|verbose] [--html[=path]] [--preview]
 ```
 
 ## Development

@@ -9,16 +9,24 @@ final class ResilienceSuggestion
     /**
      * @param  array<int, string>  $evidence
      * @param  array<int, string>  $missingSignals
+     * @param  array<int, int>  $lineNumbers
      */
     public function __construct(
         private readonly string $category,
         private readonly string $severity,
         private readonly string $assessment,
+        private readonly string $action,
         private readonly string $recommendation,
         private readonly DiscoveryFinding $finding,
         private readonly array $evidence = [],
         private readonly array $missingSignals = [],
+        private readonly array $lineNumbers = [],
     ) {}
+
+    public function action(): string
+    {
+        return $this->action;
+    }
 
     public function assessment(): string
     {
@@ -51,6 +59,19 @@ final class ResilienceSuggestion
         return $this->missingSignals;
     }
 
+    /**
+     * @return array<int, int>
+     */
+    public function lineNumbers(): array
+    {
+        return $this->lineNumbers;
+    }
+
+    public function occurrenceCount(): int
+    {
+        return count($this->lineNumbers());
+    }
+
     public function recommendation(): string
     {
         return $this->recommendation;
@@ -66,9 +87,12 @@ final class ResilienceSuggestion
      *     category: string,
      *     severity: string,
      *     assessment: string,
+     *     action: string,
      *     recommendation: string,
      *     evidence: array<int, string>,
      *     missing_signals: array<int, string>,
+     *     line_numbers: array<int, int>,
+     *     occurrence_count: int,
      *     finding: array{
      *         category: string,
      *         summary: string,
@@ -85,9 +109,12 @@ final class ResilienceSuggestion
             'category' => $this->category(),
             'severity' => $this->severity(),
             'assessment' => $this->assessment(),
+            'action' => $this->action(),
             'recommendation' => $this->recommendation(),
             'evidence' => $this->evidence(),
             'missing_signals' => $this->missingSignals(),
+            'line_numbers' => $this->lineNumbers(),
+            'occurrence_count' => $this->occurrenceCount(),
             'finding' => $this->finding()->toArray(),
         ];
     }

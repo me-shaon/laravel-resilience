@@ -17,6 +17,7 @@ class SuggestResilienceImprovementsCommand extends Command
         {path? : Base path to scan}
         {--json : Output suggestions as JSON}
         {--category=* : Limit suggestions to one or more categories}
+        {--include-covered : Include suggestions that already look covered}
         {--compact : Show a flatter, condensed console report}
         {--view= : Console view mode: compact, default, or verbose}
         {--html= : Write an HTML report to this path or the default build directory}
@@ -42,7 +43,8 @@ class SuggestResilienceImprovementsCommand extends Command
 
         $report = $engine->suggest(
             is_string($basePath) && trim($basePath) !== '' ? $basePath : null,
-            $categories
+            $categories,
+            (bool) $this->option('include-covered')
         );
 
         if ($this->option('json')) {
@@ -56,7 +58,9 @@ class SuggestResilienceImprovementsCommand extends Command
         $this->line(sprintf('Suggestions: %d', count($report->suggestions())));
 
         if ($report->suggestions() === []) {
-            $this->info('No suggestions were generated from the current findings.');
+            $this->info((bool) $this->option('include-covered')
+                ? 'No suggestions were generated from the current findings.'
+                : 'No actionable suggestions were generated from the current findings. Use [--include-covered] to review already-covered areas.');
 
             if ($this->wantsHtmlReport()) {
                 $htmlPath = $htmlReports->writeSuggestionReport($report, $mode, $this->htmlReportPathOption());
@@ -70,13 +74,14 @@ class SuggestResilienceImprovementsCommand extends Command
 
         $this->newLine();
         $this->table(
-            ['Category', 'Suggestions', 'Risk mix', 'Coverage mix'],
+            ['Category', 'Suggestions', 'Risk mix', 'Coverage mix', 'Action mix'],
             array_map(
                 fn (string $category, array $suggestions): array => [
                     $category,
                     count($suggestions),
                     $this->summarizeSuggestionField($suggestions, 'severity'),
                     $this->summarizeSuggestionField($suggestions, 'assessment'),
+                    $this->summarizeSuggestionField($suggestions, 'action'),
                 ],
                 array_keys($groupedSuggestions),
                 $groupedSuggestions
@@ -86,14 +91,14 @@ class SuggestResilienceImprovementsCommand extends Command
         if ($mode === ConsoleOutputMode::Compact) {
             $this->newLine();
             $this->table(
-                ['Category', 'Severity', 'Assessment', 'Location', 'Recommendation'],
+                ['Category', 'Severity', 'Assessment', 'Action', 'Hotspot'],
                 array_map(
-                    static fn ($suggestion): array => [
+                    fn ($suggestion): array => [
                         $suggestion->category(),
                         $suggestion->severity(),
                         $suggestion->assessment(),
-                        sprintf('%s:%d', $suggestion->finding()->relativePath(), $suggestion->finding()->line()),
-                        $suggestion->recommendation(),
+                        $suggestion->action(),
+                        $this->hotspotLabel($suggestion),
                     ],
                     $report->suggestions()
                 )
@@ -103,22 +108,27 @@ class SuggestResilienceImprovementsCommand extends Command
                 $this->newLine();
                 $this->info(sprintf('%s (%d)', $category, count($suggestions)));
                 $this->table(
-                    ['Severity', 'Assessment', 'Location', 'Recommendation'],
+                    ['Severity', 'Assessment', 'Action', 'Hotspot', 'Recommendation'],
                     array_map(
-                        static fn ($suggestion): array => [
+                        fn ($suggestion): array => [
                             $suggestion->severity(),
                             $suggestion->assessment(),
-                            sprintf('%s:%d', $suggestion->finding()->relativePath(), $suggestion->finding()->line()),
+                            $suggestion->action(),
+                            $this->hotspotLabel($suggestion),
                             $suggestion->recommendation(),
                         ],
                         $suggestions
                     )
                 );
 
-                $this->line('Signals:');
+                $this->line($mode === ConsoleOutputMode::Verbose ? 'Signals:' : 'Next focus:');
 
                 foreach ($suggestions as $suggestion) {
-                    $location = sprintf('%s:%d', $suggestion->finding()->relativePath(), $suggestion->finding()->line());
+                    $location = $this->hotspotLabel($suggestion);
+
+                    if ($mode !== ConsoleOutputMode::Verbose && $suggestion->missingSignals() === []) {
+                        continue;
+                    }
 
                     if ($suggestion->evidence() === [] && $suggestion->missingSignals() === []) {
                         $this->line(sprintf('- %s: no supporting signals were detected.', $location));
@@ -128,12 +138,15 @@ class SuggestResilienceImprovementsCommand extends Command
 
                     $parts = [];
 
-                    if ($suggestion->evidence() !== []) {
+                    if ($mode === ConsoleOutputMode::Verbose && $suggestion->evidence() !== []) {
                         $parts[] = sprintf('Evidence: %s', implode('; ', $suggestion->evidence()));
                     }
 
                     if ($suggestion->missingSignals() !== []) {
-                        $parts[] = sprintf('Missing: %s', implode('; ', $suggestion->missingSignals()));
+                        $parts[] = sprintf(
+                            $mode === ConsoleOutputMode::Verbose ? 'Missing: %s' : '%s',
+                            implode('; ', $suggestion->missingSignals())
+                        );
                     }
 
                     if ($mode === ConsoleOutputMode::Verbose) {
@@ -154,6 +167,15 @@ class SuggestResilienceImprovementsCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    private function hotspotLabel(mixed $suggestion): string
+    {
+        return sprintf(
+            '%s:%s',
+            $suggestion->finding()->relativePath(),
+            implode(',', $suggestion->lineNumbers())
+        );
     }
 
     /**

@@ -17,8 +17,22 @@ it('generates suggestions from discovery findings', function () {
         ->and($categories)->toContain('concrete-dependency');
 });
 
-it('assesses which safeguards are missing and which are already present', function () {
+it('skips covered suggestions by default and groups repeated hotspots', function () {
     $report = app(SuggestionEngine::class)->suggest('tests/Fixtures/Discovery', ['http']);
+
+    $suggestion = collect($report->suggestions())->first(
+        fn (ResilienceSuggestion $suggestion): bool => str_ends_with($suggestion->finding()->relativePath(), 'ResilienceSampleController.php')
+    );
+
+    expect($report->suggestions())->toHaveCount(1)
+        ->and($suggestion)->toBeInstanceOf(ResilienceSuggestion::class)
+        ->and($suggestion->assessment())->toBe('missing')
+        ->and($suggestion->action())->toBe('add timeout and fallback')
+        ->and($suggestion->lineNumbers())->toBe([18]);
+});
+
+it('can include covered suggestions when requested', function () {
+    $report = app(SuggestionEngine::class)->suggest('tests/Fixtures/Discovery', ['http'], true);
     $missingSuggestion = collect($report->suggestions())->first(
         fn (ResilienceSuggestion $suggestion): bool => str_ends_with($suggestion->finding()->relativePath(), 'ResilienceSampleController.php')
     );

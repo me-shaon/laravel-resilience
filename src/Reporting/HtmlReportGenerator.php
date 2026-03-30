@@ -89,6 +89,7 @@ final class HtmlReportGenerator
                 (string) count($suggestions),
                 $this->summarizeSuggestionField($suggestions, 'severity'),
                 $this->summarizeSuggestionField($suggestions, 'assessment'),
+                $this->summarizeSuggestionField($suggestions, 'action'),
             ],
             array_keys($groupedSuggestions),
             $groupedSuggestions
@@ -121,7 +122,7 @@ final class HtmlReportGenerator
                 ['label' => 'Mode', 'value' => ucfirst($mode->value)],
             ],
             summaryTitle: 'Category summary',
-            summaryHeaders: ['Category', 'Suggestions', 'Risk mix', 'Coverage mix'],
+            summaryHeaders: ['Category', 'Suggestions', 'Risk mix', 'Coverage mix', 'Action mix'],
             summaryRows: $summaryRows,
             sectionsTitle: 'Suggestions by category',
             sectionsHtml: implode("\n", $sections)
@@ -190,8 +191,9 @@ final class HtmlReportGenerator
     {
         $finding = $suggestion->finding();
         $parts = [
-            '<article class="report-card report-card-suggestion" data-entry data-category="'.$this->escape($suggestion->category()).'" data-location="'.$this->escape($this->location($finding->relativePath(), $finding->line())).'" data-severity="'.$this->escape($suggestion->severity()).'" data-assessment="'.$this->escape($suggestion->assessment()).'" data-recommendation="'.$this->escape($suggestion->recommendation()).'" data-evidence="'.$this->escape(implode(' || ', $suggestion->evidence())).'" data-missing="'.$this->escape(implode(' || ', $suggestion->missingSignals())).'" data-excerpt="'.$this->escape($finding->excerpt()).'" data-search="'.$this->escape($this->searchIndex([
+            '<article class="report-card report-card-suggestion" data-entry data-category="'.$this->escape($suggestion->category()).'" data-location="'.$this->escape($this->suggestionHotspotLabel($suggestion)).'" data-action="'.$this->escape($suggestion->action()).'" data-severity="'.$this->escape($suggestion->severity()).'" data-assessment="'.$this->escape($suggestion->assessment()).'" data-recommendation="'.$this->escape($suggestion->recommendation()).'" data-evidence="'.$this->escape(implode(' || ', $suggestion->evidence())).'" data-missing="'.$this->escape(implode(' || ', $suggestion->missingSignals())).'" data-excerpt="'.$this->escape($finding->excerpt()).'" data-search="'.$this->escape($this->searchIndex([
                 $suggestion->category(),
+                $suggestion->action(),
                 $suggestion->severity(),
                 $suggestion->assessment(),
                 $suggestion->recommendation(),
@@ -206,11 +208,12 @@ final class HtmlReportGenerator
             '<span class="badge badge-'.$this->escape($suggestion->severity()).'">'.$this->escape($suggestion->severity()).'</span>',
             '<span class="badge badge-outline">'.$this->escape($suggestion->assessment()).'</span>',
             '<span class="badge badge-subtle">'.$this->escape($suggestion->category()).'</span>',
+            '<span class="badge badge-action">'.$this->escape($suggestion->action()).'</span>',
             '</div>',
             '<h3 class="card-title">'.$this->escape($suggestion->recommendation()).'</h3>',
             '</div>',
             '<div class="card-side">',
-            '<span class="location location-pill">'.$this->escape($this->location($finding->relativePath(), $finding->line())).'</span>',
+            '<span class="location location-pill">'.$this->escape($this->suggestionHotspotLabel($suggestion)).'</span>',
             '</div>',
             '</div>',
         ];
@@ -280,6 +283,15 @@ final class HtmlReportGenerator
         $directory = dirname($relativePath);
 
         return $directory === '.' ? $relativePath : $directory;
+    }
+
+    private function suggestionHotspotLabel(ResilienceSuggestion $suggestion): string
+    {
+        return sprintf(
+            '%s:%s',
+            $suggestion->finding()->relativePath(),
+            implode(',', $suggestion->lineNumbers())
+        );
     }
 
     /**
@@ -728,6 +740,11 @@ final class HtmlReportGenerator
             color: var(--text);
         }
 
+        .badge-action {
+            background: rgba(15, 118, 110, 0.08);
+            color: var(--accent);
+        }
+
         .badge-outline {
             background: transparent;
             border: 1px solid var(--border);
@@ -1008,6 +1025,7 @@ final class HtmlReportGenerator
                     if (reportKind === "suggestion") {
                         lines.push("   Severity: " + (entry.dataset.severity || ""));
                         lines.push("   Assessment: " + (entry.dataset.assessment || ""));
+                        lines.push("   Action: " + (entry.dataset.action || ""));
                         lines.push("   Recommendation: " + (entry.dataset.recommendation || ""));
 
                         const evidence = decodeList(entry.dataset.evidence || "");
