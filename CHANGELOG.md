@@ -2,6 +2,33 @@
 
 All notable changes to `laravel-resilience` will be documented in this file.
 
+## v0.6.1 - 2026-03-30
+
+### v0.6.1
+
+#### Summary
+
+- Patch release refining the new reporting workflow with a cleaner HTML UI for both report types and clearer README guidance around compact, verbose, and HTML report usage.
+
+#### Highlights
+
+- Refreshed the shared HTML report shell so both discovery and suggestion reports look denser, cleaner, and more polished.
+- Made discovery rows significantly more compact in the HTML view while keeping the suggestion report aligned with the upgraded styling.
+- Clarified README documentation for `--compact`, `--view=verbose`, `--html`, and `--preview`.
+- Removed duplicated example-driven guidance from the README so the docs stay easier to scan.
+
+#### Verification
+
+- composer validate --no-check-publish
+- composer test
+- composer analyse
+- vendor/bin/pint --test
+
+#### Full Changelog
+
+- 7cf16b6 Refresh shared HTML report UI for both report types
+- eea0432 Clarify README reporting options and remove duplicate guidance
+
 ## v0.6.0 - 2026-03-30
 
 ### v0.6.0
